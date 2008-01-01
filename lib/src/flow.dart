@@ -498,7 +498,6 @@ class Port<M> extends FlowPort<M>{
     this._transformer = this.mixedStream.cloneTransformer();
     this.meta.update('group','nogroup');
     this.meta.update('id',id);
-    this.meta.update('tag',this.meta.get("group")+":"+id);
   }
     
   void renamePort(String name){
@@ -506,7 +505,9 @@ class Port<M> extends FlowPort<M>{
   }
 
   String get id => this.meta.get('id');
-  String get tag => this.meta.get('tag');
+  String get tag{
+    return (this.meta.get("group")+":"+id);
+  }
   
   void forcePacketCondition(n) => this.socket.forcePacketCondition(n);
   void forceBGPacketCondition(n) => this.socket.forceBGPacketCondition(n);
@@ -759,7 +760,6 @@ class Outport extends Port{
     final portType = const OutportType();
 
     static create(a,b,[c]) => new Outport(a,b,c);
-    Inport(String id,Map m,[n]): super(id,m,n);
     Outport(String id,Map m,[n]): super(id,m,n);
 
     String get portClass => this.portType.name;
@@ -1052,6 +1052,7 @@ class Network extends FlowNetwork{
      
    });
 
+
   }
   
   void createDefaultPorts(){
@@ -1059,9 +1060,9 @@ class Network extends FlowNetwork{
     this.createSpace('out');
     this.createSpace('err');
 
-    this.createInport('in:in');
-    this.createOutport('out:out');
-    this.createOutport('err:err');
+    this.makeInport('in:in');
+    this.makeOutport('out:out');
+    this.makeOutport('err:err');
   }
 
   FlowPort port(String n) => this.networkPorts.port(n);
@@ -1070,11 +1071,11 @@ class Network extends FlowNetwork{
     return this.networkPorts.createSpace(sp);
   }
 
-  FlowPort makeOutport(String id,{ Map meta: null,Port port:null }){
+  FlowPort makeOutport(String id,{ Map meta: null,Outport port:null }){
     return this.networkPorts.createOutport(id,meta:meta,port:port);
   }
 
-  FlowPort makeInport(String id,{ Map meta: null,Port port:null }){
+  FlowPort makeInport(String id,{ Map meta: null,Inport port:null }){
     return this.networkPorts.createInport(id,meta:meta,port:port);
   }
 
@@ -1594,6 +1595,8 @@ class Network extends FlowNetwork{
     inverse = hub.Hub.switchUnless(inverse,false);
     this.connectionsCompiler.add((){
       return this.filter(com,bf).then((_){
+        if(!_.data.hasPort(inport)) return null;
+
         if(!!inverse){
          this.connectionStream.emit(SparkFlowMessages.network('link','*',com,inport,nport,sid));        
           _.data.port(inport).bindPort(this.port(nport),sid); 
@@ -1614,6 +1617,8 @@ class Network extends FlowNetwork{
     inverse = hub.Hub.switchUnless(inverse,false);
     this.disconnectionsCompiler.add((){
         return this.filter(com,bf).then((_){
+        if(!_.data.hasPort(comport)) return null;
+
         if(!!inverse){
           this.connectionStream.emit(SparkFlowMessages.network('unlink','*',com,comport,nport,sid));        
           _.data.port(comport).unbindPort(this.port(nport));
@@ -1945,7 +1950,7 @@ class PortManager{
       return this.port(id);
     }
 
-    FlowPort createOutport(String id,{Map meta,Port port}){
+    FlowPort createOutport(String id,{Map meta,Outport port}){
       var path = splitPortMap(id),
           finder = hub.Enums.nthFor(path);
 
@@ -2205,9 +2210,9 @@ class Component extends FlowComponent{
     this.createSpace('out');
     this.createSpace('err');
 
-    this.createInport('in:in');
-    this.createOutport('out:out');
-    this.createOutport('err:err');
+    this.makeInport('in:in');
+    this.makeOutport('out:out');
+    this.makeOutport('err:err');
   }
 
   FlowPort port(String n){
@@ -2251,7 +2256,7 @@ class Component extends FlowComponent{
     this.comPorts.resumeAll();
     this.stateStream.emit({'type':'boot','id': this.id,'uuid':this.metas.get('uuid')});
     this.sharedState.switchState('booted');
-    if(this.network != null) return this.network.boot();
+    if(this.network != null) return this.network.boot().then((n){ return this; });
     return new Future.value(this);
   }
 
@@ -2261,7 +2266,7 @@ class Component extends FlowComponent{
     this.comPorts.pauseAll();
     this.stateStream.emit({'type':'freeze','id': this.id,'uuid':this.metas.get('uuid')});
     this.sharedState.switchState('frozen');
-    if(this.network != null) return this.network.freeze();
+    if(this.network != null) return this.network.freeze().then((n){ return this; });
     return new Future.value(this);
   }
 
@@ -2272,7 +2277,7 @@ class Component extends FlowComponent{
     this.comPorts.pauseAll();
     this.stateStream.emit({'type':'shutdown','id': this.id,'uuid':this.metas.get('uuid')});
     this.sharedState.switchState('shutdown');
-    if(this.network != null) return this.network.shutdown();
+    if(this.network != null) return this.network.shutdown().then((n){ return this; });
     return new Future.value(this);
   }
 
