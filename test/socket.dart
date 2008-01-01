@@ -14,6 +14,7 @@ void main(){
   });
   
   toPort.forceCondition((n){ return (n is String); });
+  toPort.forceCondition((n){ return (n != 'sunday'); });
 
   toPort.send('think');
   toPort.send('straight');

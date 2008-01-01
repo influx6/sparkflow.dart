@@ -229,68 +229,52 @@ class Socket<M> extends FlowSocket{
     this.streams = new SocketStream();
     this.filter = this.subscribers.iterator;
 
-    this.dtconditions = new hub.ConditionMutator('data-conditions');
-    this.bgconditions = new hub.ConditionMutator('begingroup-conditions');
-    this.egconditions = new hub.ConditionMutator('endgroup-conditions');
+    this.dtconditions = hub.Hub.createCondition('data-conditions');
+    this.bgconditions = hub.Hub.createCondition('begingroup-conditions');
+    this.egconditions = hub.Hub.createCondition('endgroup-conditions');
 
     if(from != null) this.attachFrom(from);
     
-    var emits = (n){ 
-      if(n != null) 
-        return this.mixedStream.emit(n);
-    };
 
-    this.dtconditions.whenDone(emits);
-    this.bgconditions.whenDone(emits);
-    this.egconditions.whenDone(emits);
+    this.dtconditions.whenDone(this.mixedStream.emit);
+    this.bgconditions.whenDone(this.mixedStream.emit);
+    this.egconditions.whenDone(this.mixedStream.emit);
 
   }
   
   void forcePacketCondition(bool n(dynamic r)){
-    this.dtconditions.on((d){
-      if(!!n(d)) return d;
-      return null;
-    });
+    this.dtconditions.on(n);
   }
   
   void forceBGPacketCondition(bool n(dynamic r)){
-    this.bgconditions.on((d){
-      if(!!n(d)) return d;
-      return null;
-    });
+    this.bgconditions.on(n);
   }
 
   void forceEGPacketCondition(bool n(dynamic r)){
-    this.egconditions.on((d){
-      if(!!n(d)) return d;
-      return null;
-    });
+    this.egconditions.on(n);
   }
 
   void forceCondition(bool n(dynamic r)){
     this.dtconditions.on((d){
-      if(!!n(d.data)) return d;
-      return null;
+      return n(d.data);
     });
   }
   
   void forceBGCondition(bool n(dynamic r)){
     this.bgconditions.on((d){
-      if(!!n(d.data)) return d;
-      return null;
+      return n(d.data);
     });
   }
 
   void forceEGCondition(bool n(dynamic r)){
     this.egconditions.on((d){
-      if(!!n(d.data)) return d;
-      return null;
+      return n(d.data);
     });
   }
 
-  void flushDataConditions() => this.dtconditions.freeListeners();
-  void flushBGConditions() => this.bgconditions.freeListeners();
-  void flushEGConditions() => this.egconditions.freeListeners();
+  void flushDataConditions() => this.dtconditions.clearConditions();
+  void flushBGConditions() => this.bgconditions.clearConditions();
+  void flushEGConditions() => this.egconditions.clearConditions();
 
   void flushAllConditions(){
     this.flushDataConditions();
@@ -676,7 +660,7 @@ class Port<M> extends FlowPort<M>{
         id = i;
         return fn(true);
       }
-      return fn(false);
+      return fn(null);
     });
     
     return id;

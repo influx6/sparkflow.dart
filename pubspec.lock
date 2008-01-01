@@ -6,9 +6,11 @@ packages:
     source: hosted
     version: "0.4.1"
   hub:
-    description: hub
-    source: hosted
-    version: "0.7.2"
+    description:
+      path: "../hub"
+      relative: true
+    source: path
+    version: "0.7.3"
   streamable:
     description: streamable
     source: hosted
