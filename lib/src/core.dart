@@ -72,12 +72,14 @@ class Packet extends hub.MapDecorator{
     this.owner = owner;
     this.port = portid;
     this.add('originator',owner);
+    this.add('listPacket',false);
   }
 
   dynamic get event => this.get('event');
   dynamic get data => this.get('data');
   dynamic get owner => this.get('owner');
   dynamic get port => this.get('port');
+  dynamic get isListPacket => this.get('listPacket');
 
   void set port(String d){
     this.update('port',d);

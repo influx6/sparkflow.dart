@@ -4,17 +4,22 @@ import 'package:sparkflow/sparkflow.dart';
 
 void main(){
   
+  Component.registerComponents();
+  
   var network = Network.create('example');
-
+  network.createDefaultPorts();
   network.networkStream.pause();
   
   var loop = Component.create('loop');
+  loop.createDefaultPorts();
   loop.loopPorts('in:in','out:out');
-  
+    
   var costa = Component.create('costa');
-
+  costa.createDefaultPorts();
+  
   var cosmo = Component.create('cosmo');
-
+  cosmo.createDefaultPorts();
+    
   network.addComponentInstance(loop,'loopback');
   network.addComponentInstance(costa,'costa');
   network.addComponentInstance(cosmo,'cosmo');

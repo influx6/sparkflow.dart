@@ -488,17 +488,17 @@ class Port<M> extends FlowPort<M>{
   dynamic aliasFilter;
   hub.Mutator _transformer;
   
-  static create(id,pc,m,[com]) => new Port(id,pc,m,com);
+  static create(id,m,[com]) => new Port(id,m,com);
 
-  Port(String id,String pc,Map meta,[this.owner]):super(){
+  Port(String id,Map meta,[this.owner]):super(){
     this.meta = new hub.MapDecorator.from(hub.Funcs.switchUnless(meta,{}));
     this.counter = hub.Counter.create(this);
     this.socket = new Socket(this);
     this.aliasFilter = socket.subscribers.iterator;
     this._transformer = this.mixedStream.cloneTransformer();
-    this.meta.update('class',pc);
+    this.meta.update('group','nogroup');
     this.meta.update('id',id);
-    this.meta.update('tag',this.meta.get("class")+":"+id);
+    this.meta.update('tag',this.meta.get("group")+":"+id);
   }
     
   void renamePort(String name){
@@ -507,8 +507,6 @@ class Port<M> extends FlowPort<M>{
 
   String get id => this.meta.get('id');
   String get tag => this.meta.get('tag');
-
-  String get portClass => this.meta.get('class');
   
   void forcePacketCondition(n) => this.socket.forcePacketCondition(n);
   void forceBGPacketCondition(n) => this.socket.forceBGPacketCondition(n);
@@ -731,6 +729,40 @@ class Port<M> extends FlowPort<M>{
     this.socket.flushPackets();
   }
 
+}
+
+class InPortType{
+  const InPortType();
+  bool get isInport => true;
+  bool get isOutport => false;
+  String get name =>'Inport';
+}
+
+class OutportType{
+  const OutportType();
+  bool get isOutport => true;
+  bool get isInport => false;
+  String get name =>'Outport';
+}
+
+class Inport extends Port{
+    final portType = const InPortType();
+    
+    static create(a,b,[c]) => new Inport(a,b,c);
+    Inport(String id,Map m,[n]): super(id,m,n);
+
+    String get portClass => this.portType.name;
+
+}
+
+class Outport extends Port{
+    final portType = const OutportType();
+
+    static create(a,b,[c]) => new Outport(a,b,c);
+    Inport(String id,Map m,[n]): super(id,m,n);
+    Outport(String id,Map m,[n]): super(id,m,n);
+
+    String get portClass => this.portType.name;
 }
 
 class PlaceHolder{
@@ -970,14 +1002,6 @@ class Network extends FlowNetwork{
    this.uuidRegister.add('placeholder',this.placeholder.data.uuid);
    this.stateManager = hub.StateManager.create(this);
   
-   this.networkPorts.createSpace('in');
-   this.networkPorts.createSpace('out');
-   this.networkPorts.createSpace('err');
-  
-   this.networkPorts.createPort('out:out');
-   this.networkPorts.createPort('in:in');
-   this.networkPorts.createPort('err:err');
-
    this.connections = ConnectionMeta.create(this);
 
    this.stateManager.add('dead',{
@@ -1030,24 +1054,32 @@ class Network extends FlowNetwork{
 
   }
   
+  void createDefaultPorts(){
+    this.createSpace('in');
+    this.createSpace('out');
+    this.createSpace('err');
+
+    this.createInport('in:in');
+    this.createOutport('out:out');
+    this.createOutport('err:err');
+  }
+
   FlowPort port(String n) => this.networkPorts.port(n);
   
   dynamic createSpace(String sp){
     return this.networkPorts.createSpace(sp);
   }
 
-  FlowPort makePort(String id,{ Map meta: null,Port port:null }){
-    return this.networkPorts.createPort(id,meta:meta,port:port);
+  FlowPort makeOutport(String id,{ Map meta: null,Port port:null }){
+    return this.networkPorts.createOutport(id,meta:meta,port:port);
+  }
+
+  FlowPort makeInport(String id,{ Map meta: null,Port port:null }){
+    return this.networkPorts.createInport(id,meta:meta,port:port);
   }
 
   dynamic removePort(String path){
     return this.networkPorts.destroyPort(path);
-  }
-
-  void removeDefaultPorts(){
-    this.removePort('in:in');
-    this.removePort('out:out');
-    this.removePort('err:err');
   }
 
   void close(){
@@ -1733,12 +1765,16 @@ class PortGroup{
   
   Map get toMeta{
     var m = {};
+    /* var m = {'inports':{},'outports':{}}; */
     this.portLists.onAll((e,k){
+      /* var type = k.portType.isInport ? 'inports' : 'outports'; */
       m[e] = {
         'id': e,
         'meta': new Map.from(k.meta.storage),
         'component': (hub.Valids.exist(k.owner) ? k.owner.UID : null),
-        'tag': k.tag
+        'tag': k.tag,
+        'group': k.meta.get('group'),
+        'class': k.portClass
       };
     });
 
@@ -1748,17 +1784,40 @@ class PortGroup{
   void getPort(String name){
     return this.portLists.get(name);
   }
+  
+  void addInport(String name,Map m){
+    this._addPort(name,m,(a,b,c){
+        return Inport.create(a,b,c);
+    });
+  }
 
-  void addPort(String name,Map meta){
+  void addOutPort(String name,Map m){
+    this._addPort(name,m,(a,b,c){
+        return Outport.create(a,b,c);
+    });
+  }
+
+  void addInportObject(String name,Inport m){
+    this._addPortObject(name,m);
+  }
+
+  void addOutPortObject(String name,Outport m){
+    this._addPortObject(name,m);
+  }
+
+  void _addPort(String name,Map meta,Function g){
+    if(meta == null) meta = {};
     if(this.portLists.has(name)) return null;
-    var port = Port.create(name,this.groupClass,hub.Enums.merge(meta,this.defaults),this.owner);
+    var port = g(name,hub.Enums.merge(meta,this.defaults),this.owner);
+    port.meta.update('group',this.groupClass);
     var metad = new Map.from(port.meta.storage);
     this.portLists.add(name,port);
     this.events.emit(this._packets('addPort',metad,port.owner,port.id));
   }
   
-  void addPortObject(String name,Port p){
+  void _addPortObject(String name,Port p){
     if(this.portLists.has(name)) return null;
+    p.meta.update('group',this.groupClass);
     var metad = new Map.from(p.meta.storage);
     this.portLists.add(name,p);
     this.events.emit(this._packets('addPort',metad,p.owner,p.id));
@@ -1829,6 +1888,7 @@ class PortGroup{
 
 }
 
+
 class PortManager{
     final portsGroup = hub.MapDecorator.create();
     dynamic owner;
@@ -1873,15 +1933,26 @@ class PortManager{
       });
     }
 
-    FlowPort createPort(String id,{Map meta,Port port}){
-      meta = hub.Funcs.switchUnless(meta,{'datatype':'dynamic'});
+    FlowPort createInport(String id,{Map meta,Inport port}){
       var path = splitPortMap(id),
           finder = hub.Enums.nthFor(path);
 
       if(hub.Valids.notExist(path) || !this.hasSpace(finder(0))) return null;
 
-      if(hub.Valids.exist(port)) this.portsGroup.get(finder(0)).addPortObject(finder(1),port);
-      else this.portsGroup.get(finder(0)).addPort(finder(1),meta);
+      if(hub.Valids.exist(port)) this.portsGroup.get(finder(0)).addInportObject(finder(1),port);
+      else this.portsGroup.get(finder(0)).addInport(finder(1),meta);
+
+      return this.port(id);
+    }
+
+    FlowPort createOutport(String id,{Map meta,Port port}){
+      var path = splitPortMap(id),
+          finder = hub.Enums.nthFor(path);
+
+      if(hub.Valids.notExist(path) || !this.hasSpace(finder(0))) return null;
+
+      if(hub.Valids.exist(port)) this.portsGroup.get(finder(0)).addOutPortObject(finder(1),port);
+      else this.portsGroup.get(finder(0)).addOutPort(finder(1),meta);
 
       return this.port(id);
     }
@@ -1892,7 +1963,7 @@ class PortManager{
       var path = splitPortMap(id),
           finder = hub.Enums.nthFor(path);
 
-      var port = this.getSpace(finder(0)).destroy(finder(1));
+      var port = this.getSpace(finder(0)).removePort(finder(1));
       if(hub.Valids.exist(port)) port.close();
       return port;
     }
@@ -2002,7 +2073,7 @@ class Component extends FlowComponent{
   final freezups = Distributor.create('connection_freeze');
   final shutdowns = Distributor.create('connection_shutdowns');
   hub.StateManager sharedState;
-  var connections,network,_optionsPort,_networkIIP;
+  var connections,network;
   PortManager comPorts;
 
   static registerComponents(){
@@ -2047,7 +2118,11 @@ class Component extends FlowComponent{
       k.forEach((v,i){
         var finder = hub.Enums.nthFor(i);
         proto.createSpace(n);
-        proto.makePort(finder('tag'),meta:finder('meta'));
+        hub.Funcs.when(hub.Valids.match(k['class'],'Inport'),(){
+          proto.makeInport(finder('tag'),meta:finder('meta'));
+        },(){
+          proto.makeOutport(finder('tag'),meta:finder('meta'));
+        });
       });
     });
     
@@ -2078,19 +2153,7 @@ class Component extends FlowComponent{
     });
 
     this.createSpace('static');
-    this.createSpace('in');
-    this.createSpace('err');
-    this.createSpace('out');
-
-    this.makePort('in:in',meta:{'required': true,'datatype':'dynamic'});
-    this.makePort('out:out',meta:{'required': true,'datatype':'dynamic'});
-    this.makePort('err:err',meta:{'required': true,'datatype':'dynamic'});
-
-    this.makePort('static:option',port:Port.create('option','in',{
-      'required': true
-    },this));
-
-    this.makePort('static:iip',port:Port.create('subnet-iip','in',{
+    this.makeInport('static:option',port:Inport.create('option',{
       'required': true
     },this));
 
@@ -2121,12 +2184,6 @@ class Component extends FlowComponent{
     return this.sharedState.run('dead');
   }
 
-  void removeDefaultPorts(){
-    this.comPorts.destroySpacePorts('in');
-    this.comPorts.destroySpacePorts('err');
-    this.comPorts.destroySpacePorts('out');
-  }
-
   bool hasPort(String g){
     return this.comPorts.hasPort(g);
   }
@@ -2135,8 +2192,22 @@ class Component extends FlowComponent{
     this.comPorts.createSpace(g);
   }
 
-  FlowPort makePort(String id,{ Map meta: null,Port port:null }){
-    return this.comPorts.createPort(id,meta:meta,port:port);
+  FlowPort makeInport(String id,{ Map meta: null,Inport port:null }){
+    return this.comPorts.createInport(id,meta:meta,port:port);
+  }
+
+  FlowPort makeOutport(String id,{ Map meta: null,Outport port:null }){
+    return this.comPorts.createOutport(id,meta:meta,port:port);
+  }
+
+  void createDefaultPorts(){
+    this.createSpace('in');
+    this.createSpace('out');
+    this.createSpace('err');
+
+    this.createInport('in:in');
+    this.createOutport('out:out');
+    this.createOutport('err:err');
   }
 
   FlowPort port(String n){
