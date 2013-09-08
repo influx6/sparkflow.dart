@@ -4,25 +4,30 @@ import 'package:flow/flow.dart';
 
 void main(){
   
-  var port = Port.create('in');
+  var toPort = Port.create('out');
+  var fromPort = Port.create('in');
+
   var ip = IP.create('hull',{
     'NAME':'name','AGE':'age'
   },'1');
 
-  var socket = Socket.create(port,port);
-  socket.beginGroup('<article>');
-  socket.send('1');
-  socket.endGroup('</article>');
-  socket.beginGroup('<article>');
-  socket.send('3');
-  socket.endGroup('</article>');
-  socket.beginGroup('<article>');
-  socket.send('4');
-  socket.endGroup('</article>');
+  fromPort.attach(toPort);
 
-  socket.streams.listen((n){
-    print('am getting: $n');
+  fromPort.send('love');
+  fromPort.beginGroup('<note>');
+  fromPort.send('i need a woman who heart understands the honesty in form,love and heart');
+  fromPort.endGroup('</note>');
+  
+
+  toPort.listen((n){
+    print('#toPort recieves: $n');
   });
+  
+  fromPort.send('think');
+  fromPort.send('straight');
+  fromPort.unattach();
+  fromPort.send('my');
+  fromPort.send('people');
 
-  socket.send('2');
+
 }

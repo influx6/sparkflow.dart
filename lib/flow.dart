@@ -44,8 +44,9 @@ abstract class FlowStream{
 
 /*base class for ports*/
 abstract class FlowPort extends ExtendableInvocableBinder{
-  void bind(FlowPort to);
-  void unbind(FlowPort to);
+  void connect();
+  void send(data);
+  void disconnect();
   void attach(FlowPort a);
   void unattach(FlowPort a);
 }
@@ -79,63 +80,62 @@ class IP extends FlowIP{
 
 }
 
-class GroupIP extends FlowIP{
-
-}
-
 class Socket extends FlowSocket{
-  final BufferedStream streams = BufferedStream.create();
+  final BufferedStream stream = BufferedStream.create();
   FlowPort from,to;
-  String delimiter = '/';
   bool _ong = false;
   bool _connected = false;
 	
   static create(from,to) => new Socket(from,to);
-  Socket(this.from,this.to);
+  Socket(from,to){
+    this.attach(from,to);
+  }
+  
+  void attach(FlowPort from,FlowPort to){
+    this.from = from;
+    this.to = to;
+    this.from.pipe.listen(this.stream.add);
+    this.stream.listen(this.to.pipe.add);
+    this.unbind();
+  }
 
   void beginGroup(group){
     if(this._ong) return;
     this._ong = true;
-    this.streams.buffer();
-    this.streams.add(group);
+    this.stream.buffer();
+    this.stream.add(group);
   }
 
   void endGroup([groupend]){
     if(!this._ong) return;
-    if(groupend != null) this.streams.add(groupend);
-    this.streams.endBuffer();
+    if(groupend != null) this.stream.add(groupend);
+    this.stream.endBuffer();
     this._ong = false;
   }
   
   void send(data){
-    this.streams.add(data);
+    this.stream.add(data);
   }
 
   void bind(){
     this._connected = true;
+    this.stream.resume();
   }
 
   void unbind(){
     this._connected = false;
+    this.stream.pause();
   }
 
   void close(){
-    
-  }
-}
-
-/* stream class main class*/
-class Stream extends FlowStream{
-  Pipe pipe;
-
-	static create(String id,{num max:100}){
-    return new Stream(id:id, max:max);
+    this._connected = false;
+    this.to.pipe.disconnect();
+    this.from.pipe.disconnect();
+    this.from = this.to = null;
   }
 
-  Stream({ String id, num max }){
-    this.pipe = 
-  }
-
+  bool get isConnected => !!this._connected;
+  bool get isDisconnected => !this._connected;
 }
 	
 /*class for component*/
@@ -147,17 +147,68 @@ class Component extends FlowComponent{
 
 /*the channel for IP transmission on a component*/
 class Port extends FlowPort{
-  StreamController stream = new StreamController();
+  Streamable pipe;
+  FlowSocket socket;
   String id;
   
   static create(id) => new Port(id);
 
   Port(this.id):super(){
-    this.alias('add',stream.add);
-    this.alias('listen',stream.stream.listen);
+    this.pipe = Streamable.create();
     this.binder.lock();
   }
+  
+  void beginGroup(data){
+    if(this.socket == null) return;
+    this.socket.beginGroup(data);
+  }
 
+  void send(data){
+    if(this.socket == null) return;
+    this.connect();
+    this.socket.send(data);
+    this.disconnect();
+  }
+
+  void endGroup([data]){
+    if(this.socket == null) return;
+    this.socket.endGroup(data);
+  }
+  
+  void listen(Function n){
+    this.pipe.listen(n);
+  }
+
+  void connect(){
+    if(this.socket == null) return;
+    this.socket.bind();
+  }
+
+  void disconnect(){
+    if(this.socket == null) return;
+    this.socket.unbind();
+  }
+  
+  void attach(FlowPort a){
+    if(this.socket != null) return;
+    this.socket = new Socket(this,a);
+  }
+
+  void unattach(){
+    if(this.socket == null) return;
+    this.socket.unbind();
+    this.socket.close();
+    this.socket = null;
+  }
+
+  bool get isConnected{
+    if(this.socket == null) return false;
+    return this.socket.isConnected;
+  }
+  bool get isDisconnected {
+    if(this.socket == null) return true;
+    this.socket.isDisconnected; 
+  }
 }
 
 class FlowNetwork{
