@@ -22,7 +22,11 @@ abstract class FlowAbstract{
 
 /*base class for component*/
 abstract class FlowComponent{
-	
+
+  void activate();
+  void hibernate();
+  void shutdown();
+
 }
 
 abstract class FlowSocket{
@@ -37,13 +41,8 @@ abstract class FlowSocket{
 	void detachPort();
 }
 
-/*base class for stream*/
-abstract class FlowStream{
-    void push();
-}
-
 /*base class for ports*/
-abstract class FlowPort extends ExtendableInvocableBinder{
+abstract class FlowPort{
   void connect();
   void send(data);
   void disconnect();
@@ -58,27 +57,6 @@ abstract class FlowIP{
   dynamic get meta;
 }
 
-class Flow extends FlowAbstract{
-
-  static create() => new Flow();
-  Flow();
-}
-
-class IP extends FlowIP{
-  final zone = new MapDecorator();
-
-  static create(id,Map meta,data) => new IP(id,meta,data);
-  IP(id,meta,data){
-    this.zone.add('data',data);
-    this.zone.add('id',id);
-    this.zone.add('meta',new MapDecorator.from(meta));
-  }
-
-  dynamic get Meta => this.zone.get('meta');
-  dynamic get Data => this.zone.get('data');
-  dynamic get ID => this.zone.get('id');
-
-}
 
 class Socket extends FlowSocket{
   final BufferedStream stream = BufferedStream.create();
@@ -138,13 +116,6 @@ class Socket extends FlowSocket{
   bool get isDisconnected => !this._connected;
 }
 	
-/*class for component*/
-class Component extends FlowComponent{
-  
-  static create() => new Component();
-  Component();
-}
-
 /*the channel for IP transmission on a component*/
 class Port extends FlowPort{
   Streamable pipe;
@@ -211,8 +182,42 @@ class Port extends FlowPort{
   }
 }
 
-class FlowNetwork{
+class Flow extends FlowAbstract{
 
+  static create() => new Flow();
+  Flow();
+}
+
+class IP extends FlowIP{
+  final zone = new MapDecorator();
+
+  static create(id,Map meta,data) => new IP(id,meta,data);
+  IP(id,meta,data){
+    this.zone.add('data',data);
+    this.zone.add('id',id);
+    this.zone.add('meta',new MapDecorator.from(meta));
+  }
+
+  dynamic get Meta => this.zone.get('meta');
+  dynamic get Data => this.zone.get('data');
+  dynamic get ID => this.zone.get('id');
+
+}
+
+class FlowNetwork{
+  d.ds
   static create() => new FlowNetwork();
 
+}
+
+/*class for component*/
+class Component extends FlowComponent{
+	bool _active = false;
+  String id;
+
+  static create(id) => new Component(id);
+  Component();
+  
+  bool get active => !!this._active;
+  bool get inActive => !this._active;
 }
