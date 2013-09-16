@@ -220,9 +220,9 @@ class FlowNetwork{
 class Component extends FlowComponent{
   final meta = new MapDecorator.from({'desc':'basic description'});
   final ports = new MapDecorator();
-  d.dsGraph<Component,num> subgraph =  new d.dsGraph<Component,num>();
+  d.dsGraph<Component,num> subgraph;
   d.GraphFilter filter;
-
+  
   Component(String id): super(id);
   
   FlowPort makePort(String id,[Port p]){
@@ -230,10 +230,26 @@ class Component extends FlowComponent{
     this.addInv(id,val: this.ports.get(id));
   }
   
-  void addCompositeComponent(Component a){
+  void initCompositeSystem(){
+	  if(this.subgraph == null) this.subgraph =  new d.dsGraph<Component,num>();
+	  if(this.filter == null){
+      this.filter = new d.GraphFilter.breadthFirst((key,node,arc){
+        if(node.data.id == key) return node;
+        return null;
+      });
+      this.filter.use(this.subgraph);
+    }
+  }
+  
+  void addCompositeComponent(FlowComponent a){
+    this.initCompositeSystem();
     this.subgraph.add(a);
   }
-	
+  
+  Future getComponent(String id){
+  	return this.filter.filter(id);
+  }
+  
   void renamePort(oldName,newName){
     if(!this.ports.has(oldName)) return;
 	  var pt = this.getInv(oldName);
@@ -256,6 +272,7 @@ class Component extends FlowComponent{
     }
   }
 
+  bool get isComposite => this.subgraph != null;
   String get description => this.meta.get('desc');
   FlowPort getPort(String id) => this.ports.get(id);
 
