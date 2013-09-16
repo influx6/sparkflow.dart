@@ -20,15 +20,6 @@ abstract class FlowAbstract{
 	void removeGraph();
 }
 
-/*base class for component*/
-abstract class FlowComponent{
-
-  void activate();
-  void hibernate();
-  void shutdown();
-
-}
-
 abstract class FlowSocket{
 	void bind();
 	void unbind();
@@ -37,8 +28,7 @@ abstract class FlowSocket{
 	void send();
 	void end();
 	void close();
-	void attachPort(FlowPort port);
-	void detachPort();
+	void attach(FlowPort port,FlowPort m);
 }
 
 /*base class for ports*/
@@ -47,7 +37,19 @@ abstract class FlowPort{
   void send(data);
   void disconnect();
   void attach(FlowPort a);
-  void unattach(FlowPort a);
+  void detach(FlowPort a);
+}
+
+abstract class FlowComponent extends ExtendableInvocableBinder{
+	bool _active = false;
+  String description;
+  String id;
+
+  FlowComponent(this.id);
+  
+  bool get active => !!this._active;
+  bool get inActive => !this._active;
+  
 }
 
 //base class for IP (Information Packets)
@@ -126,7 +128,6 @@ class Port extends FlowPort{
 
   Port(this.id):super(){
     this.pipe = Streamable.create();
-    this.binder.lock();
   }
   
   void beginGroup(data){
@@ -165,17 +166,22 @@ class Port extends FlowPort{
     this.socket = new Socket(this,a);
   }
 
-  void unattach(){
+  void detach(){
     if(this.socket == null) return;
     this.socket.unbind();
     this.socket.close();
     this.socket = null;
+  }
+  
+  void pipePort(FlowPort a){
+    this.listen(a.send);
   }
 
   bool get isConnected{
     if(this.socket == null) return false;
     return this.socket.isConnected;
   }
+
   bool get isDisconnected {
     if(this.socket == null) return true;
     this.socket.isDisconnected; 
@@ -205,19 +211,53 @@ class IP extends FlowIP{
 }
 
 class FlowNetwork{
-  d.ds
+  
   static create() => new FlowNetwork();
 
 }
 
 /*class for component*/
 class Component extends FlowComponent{
-	bool _active = false;
-  String id;
+  final meta = new MapDecorator.from({'desc':'basic description'});
+  final ports = new MapDecorator();
+  d.dsGraph<Component,num> subgraph =  new d.dsGraph<Component,num>();
+  d.GraphFilter filter;
 
-  static create(id) => new Component(id);
-  Component();
+  Component(String id): super(id);
   
-  bool get active => !!this._active;
-  bool get inActive => !this._active;
+  FlowPort makePort(String id,[Port p]){
+    assert(!!this.ports.add(id,(p == null ? Port.create(id) : p)));
+    this.addInv(id,val: this.ports.get(id));
+  }
+  
+  void addCompositeComponent(Component a){
+    this.subgraph.add(a);
+  }
+	
+  void renamePort(oldName,newName){
+    if(!this.ports.has(oldName)) return;
+	  var pt = this.getInv(oldName);
+	  this.delInv(oldName);
+    this.ports.destroy(oldName);
+	  pt.id = newName;
+    this.makePort(newName,pt);
+  }
+  
+  void close(){
+    this.ports.onAll((n) => n.detach());
+  }
+  
+  void loopPorts(String v,String u){
+    var from = this.ports.get(v);
+    var to = this.ports.get(u);
+
+    if(to != null && from != null){
+      from.pipePort(to);
+    }
+  }
+
+  String get description => this.meta.get('desc');
+  FlowPort getPort(String id) => this.ports.get(id);
+
 }
+

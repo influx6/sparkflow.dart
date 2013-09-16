@@ -1,6 +1,7 @@
 library flow.specs;
 
 import 'package:flow/flow.dart';
+import 'package:flow/components.dart';
 
 void main(){
   
@@ -25,9 +26,10 @@ void main(){
   
   fromPort.send('think');
   fromPort.send('straight');
-  fromPort.unattach();
+  fromPort.detach();
   fromPort.send('my');
   fromPort.send('people');
+  fromPort.send('!');
 
 
 }
