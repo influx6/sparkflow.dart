@@ -41,7 +41,7 @@ abstract class FlowPort{
 }
 
 abstract class FlowComponent extends ExtendableInvocableBinder{
-	bool _active = false;
+  bool _active = false;
   String description;
   String id;
 
@@ -59,10 +59,20 @@ abstract class FlowIP{
   dynamic get meta;
 }
 
+abstract class FlowNetwork{
+  String id;
+
+  FlowNetwork(this.id);
+  void add(FlowComponent n,[String uniq]);
+  void remove(String n);
+  void connect(String m,String mport,String n,String nport);
+  void disconnect(String m,String n);
+}
 
 class Socket extends FlowSocket{
   final BufferedStream stream = BufferedStream.create();
   FlowPort from,to;
+  String id;
   bool _ong = false;
   bool _connected = false;
 	
@@ -79,11 +89,11 @@ class Socket extends FlowSocket{
     this.unbind();
   }
 
-  void beginGroup(group){
+  void beginGroup([group]){
     if(this._ong) return;
     this._ong = true;
     this.stream.buffer();
-    this.stream.add(group);
+    if(group != null) this.stream.add(group);
   }
 
   void endGroup([groupend]){
@@ -117,17 +127,59 @@ class Socket extends FlowSocket{
   bool get isConnected => !!this._connected;
   bool get isDisconnected => !this._connected;
 }
+
+class OptionPort extends FlowPort{
+  final Streamable stream = Streamable.create();
+  String id;
+  Function _bkhandler;
+  OptionPort _p;
+
+  static create(id) => new OptionPort(id);
+
+  OptionPort(this.id);
+
+  void connect(){
+    this.stream.resume();
+  }
+
+  void disconnect(){
+    this.stream.pause();
+  }
+
+  void send(data){
+    this.stream.add(data);
+  }
 	
+  onDrain(Function n) => this.stream.onDrain(n);
+  offDrain(Function n) => this.stream.offDrain(n);
+  
+  void attach(OptionPort a){
+    this._bkhandler = this.stream.handle;
+    this._p = a;
+    this.stream.listen((n){
+      this._p.send(n);
+      this._bkhandler(n);
+    });
+  }
+
+  void detach(){
+    this.stream.listen(this._bkhandler);
+  }
+  
+}
+
 /*the channel for IP transmission on a component*/
 class Port extends FlowPort{
   Streamable pipe;
   FlowSocket socket;
   String id;
+  String componentID;
   
-  static create(id) => new Port(id);
+  static create(id,[cid]) => new Port(id,cid);
 
-  Port(this.id):super(){
+  Port(this.id,[cid]):super(){
     this.pipe = Streamable.create();
+    this.componentID = cid;
   }
   
   void beginGroup(data){
@@ -188,66 +240,26 @@ class Port extends FlowPort{
   }
 }
 
-class Flow extends FlowAbstract{
-
-  static create() => new Flow();
-  Flow();
-}
-
-class IP extends FlowIP{
-  final zone = new MapDecorator();
-
-  static create(id,Map meta,data) => new IP(id,meta,data);
-  IP(id,meta,data){
-    this.zone.add('data',data);
-    this.zone.add('id',id);
-    this.zone.add('meta',new MapDecorator.from(meta));
-  }
-
-  dynamic get Meta => this.zone.get('meta');
-  dynamic get Data => this.zone.get('data');
-  dynamic get ID => this.zone.get('id');
-
-}
-
-class FlowNetwork{
-  
-  static create() => new FlowNetwork();
-
-}
 
 /*class for component*/
 class Component extends FlowComponent{
   final meta = new MapDecorator.from({'desc':'basic description'});
+  final subNetwork = new MapDecorator();
   final ports = new MapDecorator();
-  d.dsGraph<Component,num> subgraph;
-  d.GraphFilter filter;
+  final OptionPort options = OptionPort.create('option');
+  String uuid;
+
   
-  Component(String id): super(id);
+  static create(String id) => new Component(id);
+
+  Component(String id): super(id){
+    this.ports.add('option',this.options);
+    this.addInv('option',val: this.ports.get('option'));
+  }
   
   FlowPort makePort(String id,[Port p]){
     assert(!!this.ports.add(id,(p == null ? Port.create(id) : p)));
     this.addInv(id,val: this.ports.get(id));
-  }
-  
-  void initCompositeSystem(){
-	  if(this.subgraph == null) this.subgraph =  new d.dsGraph<Component,num>();
-	  if(this.filter == null){
-      this.filter = new d.GraphFilter.breadthFirst((key,node,arc){
-        if(node.data.id == key) return node;
-        return null;
-      });
-      this.filter.use(this.subgraph);
-    }
-  }
-  
-  void addCompositeComponent(FlowComponent a){
-    this.initCompositeSystem();
-    this.subgraph.add(a);
-  }
-  
-  Future getComponent(String id){
-  	return this.filter.filter(id);
   }
   
   void renamePort(oldName,newName){
@@ -272,9 +284,82 @@ class Component extends FlowComponent{
     }
   }
 
-  bool get isComposite => this.subgraph != null;
   String get description => this.meta.get('desc');
   FlowPort getPort(String id) => this.ports.get(id);
 
 }
 
+class Network extends FlowNetwork{
+  final components = new d.dsGraph<FlowComponent,int>();
+  final sockets = new d.dsGraph<FlowSocket,int>();
+  final initialIP = d.dsList.create();
+
+  //the graph filters
+  final d.GraphFilter componentFinder = new d.GraphFilter.depthFirst((key,node,arc){
+      if(node.data.uuid == key) return node;
+      return null;
+  });
+
+  final d.GraphFilter socketFinder = new d.GraphFilter.depthFirst((key,node,arc){
+      if(node.data.id == key) return node;
+      return null;
+  });
+
+
+  static create(id) => new Network(id);
+
+  Network(id): super(id){
+   this.componentFinder.use(this.components);
+   this.socketFinder.use(this.sockets);
+  }
+  
+  Future get(String m){
+    return this.componentFinder.filter(m).then((_){
+      return _.data;
+    }).catchError((e){ 
+        print(e);
+    });
+  }
+
+  void add(FlowComponent a,String uniqiD){
+      var node = this.components.add(a);
+      node.data.uuid = uniqiD;
+      this.components.bind(this.components.first,node,0);
+      this.components.bind(node,this.components.first,1);
+  }
+
+  void connect(String a,String aport, String b , String bport){
+    Future.wait(this.componentFinder.filter(a),this.componentFinder.filter(b)).then((_){
+      var from = _[0], to = _[1];
+      from.data.getPort(aport).attach(to.data.getPort(bport));
+      this.components.bind(from,to,1);
+    }).catchError((e){
+      throw e;
+    });
+  }
+
+
+  void disconnect(String a,String b,String aport){
+    Future.wait(this.componentFinder.filter(a),this.componentFinder.filter(b)).then((_){
+      var from = _[0], to = _[1];
+      from.data.getPort(aport).detach();
+      this.components.unbind(from,to,1);
+    }).catchError((e){
+      print(e);
+    });
+  }
+  
+  void remove(String a){
+    this.componentFinder.filter(a).then((_){
+      _.data.detach();
+      this.components.eject(_);
+    });
+  }
+
+}
+
+class Flow extends FlowAbstract{
+
+  static create() => new Flow();
+  Flow();
+}
