@@ -5,22 +5,22 @@ import 'package:ds/ds.dart';
 
 void main(){
   
-  var network = Network.create('basics');
+  var network = Network.create();
 
-  var rep1 = Component.create('loopback');
+  var rep1 = Component.create();
   rep1.renamePort('in','suck');
   rep1.renamePort('out','spill');
   
-  var rep2 = Component.create('slug');
+  var rep2 = Component.create();
   rep2.renamePort('in','en');
 
-  var cosmo = Component.create('super');
+  var cosmo = Component.create();
   cosmo.makePort('en');
   cosmo.makePort('out');
 
-  network.add(rep1,rep1.id);
-  network.add(rep2,rep2.id);
-  network.add(cosmo,cosmo.id);
+  network.add(rep1,'loopback');
+  network.add(rep2,'basic');
+  network.add(cosmo,'cosmo');
   
   network.get('super').then((_){
     print('i got $_');

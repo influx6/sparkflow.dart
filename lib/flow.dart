@@ -238,6 +238,12 @@ class Port extends FlowPort{
     if(this.socket == null) return true;
     this.socket.isDisconnected; 
   }
+  
+  void close(){
+	  this.pipe.close();
+	  this.pipe = null;
+	  this.detach();
+  }
 }
 
 
@@ -250,9 +256,9 @@ class Component extends FlowComponent{
   String uuid;
 
   
-  static create(String id) => new Component(id);
+  static create([String id]) => new Component(id);
 
-  Component(String id): super(id){
+  Component([String id]): super((id == null ? 'Component' : id)){
     this.ports.add('option',this.options);
     this.addInv('option',val: this.ports.get('option'));
   }
@@ -290,34 +296,38 @@ class Component extends FlowComponent{
 }
 
 class Network extends FlowNetwork{
+  //final outport for the particular network,optionally usable
+  final Port out = Port.create('networkOutport');
+  //final inport for the particular network,optionally usable
+  final Port in = Port.create('networkInport');
+  // the error streams
+  final errorStream = Streamable.create();
+  // graph of loaded components
   final components = new d.dsGraph<FlowComponent,int>();
-  final sockets = new d.dsGraph<FlowSocket,int>();
+  // list of sockets created with the components
+  final sockets = new d.dsList<FlowSocket>();
+  // list of Initial Information Packets
   final initialIP = d.dsList.create();
-
+  // the socket list iterator
+  final socketFinder = null;
   //the graph filters
   final d.GraphFilter componentFinder = new d.GraphFilter.depthFirst((key,node,arc){
       if(node.data.uuid == key) return node;
       return null;
   });
-
-  final d.GraphFilter socketFinder = new d.GraphFilter.depthFirst((key,node,arc){
-      if(node.data.id == key) return node;
-      return null;
-  });
-
-
+  
   static create(id) => new Network(id);
 
   Network(id): super(id){
    this.componentFinder.use(this.components);
-   this.socketFinder.use(this.sockets);
+   this.socketFinder = this.sockets.iterator;
   }
   
-  Future get(String m){
+  Future filter(String m){
     return this.componentFinder.filter(m).then((_){
       return _.data;
     }).catchError((e){ 
-        print(e);
+      this.errorStream.add(e);
     });
   }
 
@@ -334,7 +344,7 @@ class Network extends FlowNetwork{
       from.data.getPort(aport).attach(to.data.getPort(bport));
       this.components.bind(from,to,1);
     }).catchError((e){
-      throw e;
+      this.errorStream.add(e);
     });
   }
 
@@ -345,7 +355,7 @@ class Network extends FlowNetwork{
       from.data.getPort(aport).detach();
       this.components.unbind(from,to,1);
     }).catchError((e){
-      print(e);
+      this.errorStream.add(e);
     });
   }
   
@@ -353,9 +363,16 @@ class Network extends FlowNetwork{
     this.componentFinder.filter(a).then((_){
       _.data.detach();
       this.components.eject(_);
+    }).catchError((e){
+      this.errorStream.add(e);
     });
   }
-
+  
+  void linkOut(String com,String comport){
+	  this.filter(com).then((_){
+		  
+	  });
+  }
 }
 
 class Flow extends FlowAbstract{

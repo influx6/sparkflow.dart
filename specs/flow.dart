@@ -1,16 +1,11 @@
 library flow.specs;
 
 import 'package:flow/flow.dart';
-import 'package:flow/components.dart';
 
 void main(){
   
   var toPort = Port.create('out');
   var fromPort = Port.create('in');
-
-  var ip = IP.create('hull',{
-    'NAME':'name','AGE':'age'
-  },'1');
 
   fromPort.attach(toPort);
 

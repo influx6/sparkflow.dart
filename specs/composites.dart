@@ -5,17 +5,17 @@ import 'package:flow/components/repeater.dart';
 
 void main(){
   
-  var rep1 = Repeater.create('loopback');
+  var rep1 = Repeater.create();
   rep1.renamePort('in','suck');
   rep1.renamePort('out','spill');
   
-  var rep2 = Prefixer.create('slug');
+  var rep2 = Prefixer.create();
   rep2.renamePort('in','en');
 
   rep2.option.connect();
   rep2.option.send('slug::');
 
-  var cosmo = Component.create('super');
+  var cosmo = Component.create();
   cosmo.makePort('en');
   cosmo.makePort('out');
 

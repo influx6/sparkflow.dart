@@ -4,9 +4,9 @@ import 'package:flow/flow.dart';
 
 class Repeater extends Component{
 
-  static create([String id]) => new Repeater(id);
+  static create() => new Repeater();
   
-  Repeater([String id]): super((id != null ? id : "Repeater")){
+  Repeater(): super("Repeater"){
     this.meta.update('desc','a simple synchronous repeater component');
     this.makePort('in');
     this.makePort('out');
@@ -20,9 +20,9 @@ class Prefixer extends Component{
   final _buffer = new StringBuffer();
   String _prefix='';
 
-  static create([String id]) => new Prefixer(id);
+  static create() => new Prefixer();
 
-  Prefixer([String id]): super(id != null ? id : "Prefixer"){
+  Prefixer(): super("Prefixer"){
     this.meta.update('desc','prefixing a value to a IP');
     this.makePort('in');
     this.makePort('out');
