@@ -3,25 +3,31 @@
 packages:
   ds:
     description:
-      path: "/Users/boxy/Apps/codelab/dart/flow/../ds"
+      path: "D:\\Apps\\codelab\\dart\\sparkflow\\../ds"
       relative: true
     source: path
-    version: "0.0.1"
+    version: "0.0.3"
   hub:
     description:
-      path: "/Users/boxy/Apps/codelab/dart/flow/../hub"
+      path: "D:\\Apps\\codelab\\dart\\sparkflow\\../hub"
       relative: true
     source: path
-    version: "0.1.1"
+    version: "0.1.3"
   invocable:
     description:
-      path: "/Users/boxy/Apps/codelab/dart/flow/../invocable"
+      path: "D:\\Apps\\codelab\\dart\\sparkflow\\../invocable"
       relative: true
     source: path
-    version: "0.1.1"
-  pipes:
+    version: "0.3.0"
+  statemanager:
     description:
-      path: "/Users/boxy/Apps/codelab/dart/flow/../pipes"
+      path: "D:\\Apps\\codelab\\dart\\sparkflow\\../statemanager"
       relative: true
     source: path
     version: "0.0.1"
+  streamable:
+    description:
+      path: "D:\\Apps\\codelab\\dart\\sparkflow\\../streamable"
+      relative: true
+    source: path
+    version: "0.0.5"

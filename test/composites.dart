@@ -1,7 +1,7 @@
 library flow.specs;
 
-import 'package:flow/flow.dart';
-import 'package:flow/components/repeater.dart';
+import 'package:sparkflow/sparkflow.dart';
+import 'package:sparkflow/components/repeater.dart';
 
 void main(){
   
@@ -22,9 +22,9 @@ void main(){
   cosmo.addCosmo(rep1);
   cosmo.addCosmo(rep2);
 
-  cosmo.en.attach(rep1.suck);
-  rep1.spill.attach(rep2.en);
-  rep2.out.attach(cosmo.out);
+  cosmo.port('en').attach(rep1.suck);
+  rep1.port('spill').attach(rep2.en);
+  rep2.port('out').attach(cosmo.out);
   
   cosmo.out.listen((_){
     print('cosmo received: $_');

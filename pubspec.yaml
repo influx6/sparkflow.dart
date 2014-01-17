@@ -1,14 +1,16 @@
-name: flow
+name: sparkflow
 version: 0.0.1
 author: Alexander Ewetumo
-email: trinoxf@gmail.com
 description: a flow-based approach to app development
+homepage: http://github.com/influx6/sparkflow.dart
 dependencies:
-  pipes:
-    path: ../pipes
   ds:
     path: ../ds
-  invocable:
-    path: ../invocable
   hub:
     path: ../hub
+  invocable:
+    path: ../invocable
+  statemanager:
+    path: ../statemanager
+  streamable:
+    path: ../streamable
