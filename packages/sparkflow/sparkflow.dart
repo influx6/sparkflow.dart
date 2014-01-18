@@ -227,20 +227,25 @@ class Socket extends FlowSocket{
     if(from != null) this.attachFrom(from);
   }
 
+  dynamic get dataStream => this.streams.data;
+  dynamic get endGroupStream => this.streams.end;
+  dynamic get beginGroupStream => this.streams.begin;
+  dynamic get mixedStream => this.streams.stream;
+  
   dynamic get dataTransformer => this.streams.dataTransformer;
   dynamic get endGroupTransformer => this.streams.endGroupTransformer;
   dynamic get beginGroupTransformer => this.streams.beginGroupTransformer;
-  dynamic get streamTransformer => this.streams.streamTransformer;
+  dynamic get mixedTransformer => this.streams.streamTransformer;
   
   dynamic get dataClosed => this.streams.dataClosed;
   dynamic get endGroupClosed => this.streams.endGroupClosed;
   dynamic get beginGroupClosed => this.streams.beginGroupClosed;
-  dynamic get streamClosed => this.streams.streamClosed;
+  dynamic get mixedClosed => this.streams.streamClosed;
 
   dynamic get dataDrained => this.streams.dataDrained;
   dynamic get endGroupDrained => this.streams.endGroupDrained;
   dynamic get beginGroupDrained => this.streams.beginGroupDrained;
-  dynamic get streamDrained => this.streams.streamDrained;
+  dynamic get mixedDrained => this.streams.streamDrained;
 
   void whenHalted(Function m){
     this.halted.on(m);
@@ -405,6 +410,7 @@ class Port extends FlowPort{
   Map aliases = new Map();
   FlowSocket socket;
   dynamic aliasFilter;
+  hub.Mutator _egtransformer,_bgtransformer,_dttransformer;
   String id,componentID;
   
   static create(id,[cid]) => new Port(id,cid);
@@ -414,22 +420,31 @@ class Port extends FlowPort{
     this.counter = hub.Counter.create(this);
     this.socket = Socket.create(this);
     this.aliasFilter = socket.subscribers.iterator;
+
+    this._egtransformer = this.endGroupStream.cloneTransformer();
+    this._bgtransformer = this.beginGroupStream.cloneTransformer();
+    this._dttransformer = this.dataStream.cloneTransformer();
   }
 
+  dynamic get dataStream => this.socket.dataStream;
+  dynamic get endGroupStream => this.socket.endGroupStream;
+  dynamic get beginGroupStream => this.socket.beginGroupStream;
+  dynamic get mixedStream => this.socket.mixedStream;
+  
   dynamic get dataTransformer => this.socket.dataTransformer;
   dynamic get endGroupTransformer => this.socket.endGroupTransformer;
   dynamic get beginGroupTransformer => this.socket.beginGroupTransformer;
-  dynamic get streamTransformer => this.socket.streamTransformer;
+  dynamic get mixedTransformer => this.socket.mixedTransformer;
   
   dynamic get dataDrained => this.socket.dataDrained;
   dynamic get endGroupDrained => this.socket.endGroupDrained;
   dynamic get beginGroupDrained => this.socket.beginGroupDrained;
-  dynamic get streamDrained => this.socket.streamDrained;
+  dynamic get mixedDrained => this.socket.mixedDrained;
 
   dynamic get dataClosed => this.socket.dataClosed;
   dynamic get endGroupClosed => this.socket.endGroupClosed;
   dynamic get beginGroupClosed => this.socket.beginGroupClosed;
-  dynamic get streamClosed => this.socket.streamClosed;
+  dynamic get mixedClosed => this.socket.mixedClosed;
 
   bool boundedToPort(FlowPort a){
     return this.socket.boundedToPort(a);
@@ -440,6 +455,23 @@ class Port extends FlowPort{
   }
 
   void unbindAll() => this.socket.detachAll();
+
+  void _updatePortTransformerClones(){
+    //clear the done list
+    this._dttransformer.clearDone();
+    this._bgtransformer.clearDone();
+    this._egtransformer.clearDone();
+    //recheck if any change,then update if there is
+    if(this.dataTransformer.listenersLength != this._dttransformer.listenersLength){
+      this._dttransformer.updateTransformerListFrom(this.dataTransformer);
+    }
+    if(this.beginGroupTransformer.listenersLength != this._bgtransformer.listenersLength){
+      this._bgtransformer.updateTransformerListFrom(this.beginGroupTransformer);
+    }
+    if(this.endGroupTransformer.listenersLength != this._egtransformer.listenersLength){
+      this._egtransformer.updateTransformerListFrom(this.endGroupTransformer);
+    }
+  }
 
   dynamic bindTo(FlowPort a){
     return this.socket.attachTo(a);
@@ -475,8 +507,6 @@ class Port extends FlowPort{
     this.checkAliases();
     var sub = this.socket.detachPort(a);
     if(sub == null) return null;
-    print('port unbinding with ${sub.alias}');
-
     this.removeSocketAlias(sub.alias);
     sub.env.suppressErrors();
     if(sub.alias != null) sub.alias = null;
@@ -534,8 +564,12 @@ class Port extends FlowPort{
 
   void beginGroup(data,[String alias]){
     if(alias != null){
+      this._updatePortTransformerClones();
       var sub = this.getSocketAlias(alias);
-      if(sub != null) sub.socket.beginGroup(data);
+      if(sub != null){
+        this._bgtransformer.whenDone(sub.socket.beginGroup);
+        this._bgtransformer.emit(data);
+      }      
       return;
     }
     this.socket.beginGroup(data);
@@ -543,8 +577,12 @@ class Port extends FlowPort{
 
   void send(data,[String alias]){
     if(alias != null){
+      this._updatePortTransformerClones();
       var sub = this.getSocketAlias(alias);
-      if(sub != null) sub.socket.send(data);
+      if(sub != null){
+        this._dttransformer.whenDone(sub.socket.send);
+        this._dttransformer.emit(data);
+      }
       return;
     }
     this.socket.send(data);
@@ -552,8 +590,12 @@ class Port extends FlowPort{
 
   void endGroup(data,[String alias]){
     if(alias != null){
+      this._updatePortTransformerClones();
       var sub = this.getSocketAlias(alias);
-      if(sub != null) sub.socket.endGroup(data);
+      if(sub != null){
+        this._egtransformer.whenDone(sub.socket.endGroup);
+        this._egtransformer.emit(data);
+      }   
       return;
     }
     this.socket.endGroup(data);

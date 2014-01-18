@@ -139,7 +139,7 @@ class Streamable<T> extends Streamer<T>{
   int max;
   
   static create([n]) => new Streamable(n);
-  
+
   Streamable([int m]){
     this.max = m;
     this.state = StateManager.create(this);
@@ -205,7 +205,13 @@ class Streamable<T> extends Streamer<T>{
     this.pushState.switchState("strict");
     
   }
-  
+
+  Mutator cloneTransformer(){
+    var clone = Hub.createMutator('clone-transformer');
+    clone.updateTransformerListFrom(this.transformer);
+    return clone;
+  }
+
   void emit(T e){    
     if(e == null) return;
     if(this.isFull || this.streamClosed) return;

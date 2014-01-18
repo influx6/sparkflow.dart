@@ -199,7 +199,7 @@ class Switch{
 }
 
 class Distributor<T>{
-  final listeners = new List();
+  List<Function> listeners = new List<Function>();
   final done = new List<Function>();
   final once = new List<Function>();
   final _removal = new List<Function>();
@@ -235,11 +235,15 @@ class Distributor<T>{
   }
   
   void free(){
-    this.listeners.clear();
+    this.freeListeners();
     this.done.clear();
     this.once.clear();
   }
 
+  void freeListeners(){
+    this.listeners.clear();
+  }
+  
   void emit(T n){
     if(this.locked) return;
     this.fireOncers(n);
@@ -298,7 +302,19 @@ class Distributor<T>{
     this._locked = false;
   }
   
+  List cloneListeners(){
+    return new List<Function>.from(this.listeners);
+  }
+
+  void clearDone(){
+    this.done.clear();
+  }
+
   bool get locked => !!this._locked;
+
+  int get listenersLength => this.listeners.length; 
+  int get doneLength => this.done.length; 
+
 }
 
 class Mutator<T> extends Distributor<T>{
@@ -306,6 +322,14 @@ class Mutator<T> extends Distributor<T>{
     
     Mutator(String id): super(id);
     
+    void replaceTransformersListWith(List<Function> a){
+      this.listeners = a;
+    }
+
+    void updateTransformerListFrom(Mutator m){
+      this.replaceTransformersListWith(m.cloneListeners());
+    }
+
     void emit(T n){
       this.fireListeners(n);
     }

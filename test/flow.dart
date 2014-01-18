@@ -23,13 +23,24 @@ void main(){
 	fromPort.endGroup('</note>');
 
 	fromPort.disableDelimiter();
+  
+	//transformer will will always apply to streams even when cherry picking who to send to
+	fromPort.dataTransformer.on((n){
+	  return n+"::";
+	});
+	
+	fromPort.send('someone');
 
-	fromPort.send('think');
+	// this will automaitcally send to the subscriber socket at alias/id 1 but transformation of parent streams
+	// will still apply regardless
+	fromPort.send('think','1');
+	//clear out the transformer
+	fromPort.dataTransformer.freeListeners();
+	
 	fromPort.send('straight');
 	fromPort.send('my');
 	fromPort.send('people');
 
-	print(fromPort.getAliasOfPort(toPort));
 	fromPort.unbindPort(toPort);
 
 	fromPort.send('!');
