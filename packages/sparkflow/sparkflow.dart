@@ -1016,6 +1016,7 @@ class Component extends FlowComponent{
 
     this.ports.add('option',Port.create('option'));
     this.ports.add('in',Port.create('in'));
+    this.ports.add('err',Port.create('err'));
     this.ports.add('out',Port.create('out'));
 
     this.alias.add('in','in');

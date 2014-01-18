@@ -264,7 +264,7 @@ class dsGraph<T,M> extends dsAbstractGraph<T,M>{
        this.nodes.iterator.cascade(n,m);
     }
 
-    void eject(dsGraphNode<T,M> to){
+    dynamic eject(dsGraphNode<T,M> to){
       var handle = this.nodes.iterator;
       while(handle.moveNext()){
         handle.current.removeArc(to);
