@@ -101,7 +101,7 @@
     var cosmo = Component.create('cosmo');
 
     //lets loop cosmo in port to its outport,a basic repeater 
-    
+
     cosmo.loopPorts('in','out');
 
     var network = Network.create("testBed");
@@ -137,7 +137,8 @@
     network
     .connect('prefixer','in','repeater','out')
     .connect('repeater','in','cosmo','out',null,true).whenConnectionCompletes((_){
-    //its not always necessary for a networks in and outports to be connect,but there are cases eg composite components
+
+      //its not always necessary for a networks in and outports to be connect,but there are cases eg composite components
       //where data must be fed into the network for its components to process
       
       //we will connect networks in port (nin) to cosmo 'in' port
