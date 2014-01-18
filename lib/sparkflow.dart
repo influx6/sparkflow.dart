@@ -1048,6 +1048,7 @@ class Network extends FlowNetwork{
     });
     this.stateManager.switchState('dead');
     this.infoStream.send({ 'type':"shutdownNetwork", 'message': 'shutting down/killing network operations'});
+    this.stopStamp = new Date.now();
     return (future == null ? new Future.value(true) : future);
   }
 
@@ -1066,6 +1067,7 @@ class Network extends FlowNetwork{
     this.stateManager.switchState('alive');
     this.infoStream.send({ 'type':"bootingNetwork", 'message': 'booting network operations'});
     this.unlockNetworkStreams();
+    this.startStamp = new Date.now();
     return (future == null ? new Future.value(true) : future);
   }
 

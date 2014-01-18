@@ -1,5 +1,5 @@
 name: sparkflow
-version: 0.0.3
+version: 0.0.4
 author: Alexander Ewetumo<trinoxf@gmail.com>
 description: "a flow-based approach to app development using a simple expressive fbp\
   \ api.\r\n\r\nTargets:\r\n\tAPi Complete\r\n\r\nToDo:\r\n\tAdd basic level Componenets\
