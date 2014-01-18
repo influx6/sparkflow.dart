@@ -157,6 +157,16 @@ class SocketStream{
   dynamic get beginGroupTransformer => this.begin.transformer;
   dynamic get streamTransformer => this.stream.transformer;
 
+  dynamic get dataDrained => this.data.drained;
+  dynamic get endGroupDrained => this.end.drained;
+  dynamic get beginGroupDrained => this.begin.drained;
+  dynamic get streamDrained => this.stream.drained;
+  
+  dynamic get dataClosed => this.data.closed;
+  dynamic get endGroupClosed => this.end.closed;
+  dynamic get beginGroupClosed => this.begin.closed;
+  dynamic get streamClosed => this.stream.closed;
+
   void whenDrained(Function n){
     this.stream.whenDrained(n);  
   }
@@ -224,6 +234,16 @@ class Socket extends FlowSocket{
   dynamic get beginGroupTransformer => this.streams.beginGroupTransformer;
   dynamic get streamTransformer => this.streams.streamTransformer;
   
+  dynamic get dataClosed => this.streams.dataClosed;
+  dynamic get endGroupClosed => this.streams.endGroupClosed;
+  dynamic get beginGroupClosed => this.streams.beginGroupClosed;
+  dynamic get streamClosed => this.streams.streamClosed;
+
+  dynamic get dataDrained => this.streams.dataDrained;
+  dynamic get endGroupDrained => this.streams.endGroupDrained;
+  dynamic get beginGroupDrained => this.streams.beginGroupDrained;
+  dynamic get streamDrained => this.streams.streamDrained;
+
   void metas(String key,[dynamic v]){
     this.streams.metas(key,v);
   }
@@ -379,6 +399,16 @@ class Port extends FlowPort{
   dynamic get beginGroupTransformer => this.socket.beginGroupTransformer;
   dynamic get streamTransformer => this.socket.streamTransformer;
   
+  dynamic get dataDrained => this.socket.dataDrained;
+  dynamic get endGroupDrained => this.socket.endGroupDrained;
+  dynamic get beginGroupDrained => this.socket.beginGroupDrained;
+  dynamic get streamDrained => this.socket.streamDrained;
+
+  dynamic get dataClosed => this.socket.dataClosed;
+  dynamic get endGroupClosed => this.socket.endGroupClosed;
+  dynamic get beginGroupClosed => this.socket.beginGroupClosed;
+  dynamic get streamClosed => this.socket.streamClosed;
+
   bool boundedToPort(FlowPort a){
     return this.socket.boundedToPort(a);
   }
@@ -933,9 +963,12 @@ class Component extends FlowComponent{
   FlowPort makePort(String id,[Port p,bool override]){
     if(this.alias.has(id) && (!override || override == null)) return null;
     var port = (p == null ? Port.create(id) : p);
-    if(!!override) return this.ports.update(this.alias.get(id),port);
-    this.alias.add(id,id);
-    return this.ports.add(this.alias.get(id),port);
+    if(override != null && !!override) this.ports.update(this.alias.get(id),port);
+    else{
+      this.alias.add(id,id);
+      this.ports.add(this.alias.get(id),port);
+    }
+    return this.ports.get(this.alias.get(id));
   }
   
   

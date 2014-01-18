@@ -135,7 +135,7 @@ class Streamable<T> extends Streamer<T>{
   final Distributor closed = Distributor.create('streamable-close');
   final Distributor listeners = Distributor.create('streamable-listeners');
   dynamic iterator;
-  StateManager state,pushState,readyState;
+  StateManager state,pushState;
   int max;
   
   static create([n]) => new Streamable(n);
@@ -144,16 +144,7 @@ class Streamable<T> extends Streamer<T>{
     this.max = m;
     this.state = StateManager.create(this);
     this.pushState = StateManager.create(this);
-    this.readyState = StateManager.create(this);
     this.iterator = this.streams.iterator;
-    
-    this.readyState.add('ready', {
-      'listening': (target,control){ return true; },
-    });
-    
-    this.readyState.add('unready', {
-      'listening': (target,control){ return false; },
-    });
 
     this.pushState.add('strict', {
       'strict': (target,control){ return true; },
@@ -212,7 +203,6 @@ class Streamable<T> extends Streamer<T>{
     
     this.state.switchState('resumed');
     this.pushState.switchState("strict");
-    this.readyState.switchState("unready");
     
   }
   

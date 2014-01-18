@@ -9,6 +9,27 @@ abstract class Comparable{
   bool compare(dynamic d);
 }
 
+class Transformable{
+  Function _transformer;
+  dynamic _bind;
+
+  static create(Function n) => new Transformable(n);
+
+  Transformable(Function n){
+    this._transformer = n;
+  }
+
+  void change(dynamic n){
+    this._bind = n;
+  }
+
+  dynamic out(dynamic j){
+    if(this._bind == null) return null;
+    return this._transformer(this._bind,j);
+  }
+}
+
+
 abstract class Injector<T>{
   final consumer = Hub.createDistributor('Injector');
   Function condition,modifier;
