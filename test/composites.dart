@@ -23,7 +23,7 @@ void main(){
   network.add(rep2,'prefixer',(meta){
   	//print('internal initial socket: ${meta.toString().split(',').join('\n')}');
 
-  	//attach the IIP to the component to the component's option port
+  	//attach the IIP to the component's option port
   	meta.socket.attachPort(meta.component.port('option'));
   });
 
@@ -58,7 +58,7 @@ void main(){
 	  	print('network spouting: $n');
 	  });
 
-	  //only the prefixer component requires data feed into it before its operation,so add a IIP data for it,
+	  //only the prefixer component requires data feed into it before its operational,so add a IIP data for it,
 	  //you can always add another iip data to change the prefix;
 	  network.addInitial('prefixer','network::');
 
