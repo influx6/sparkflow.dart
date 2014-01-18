@@ -41,12 +41,11 @@ void main(){
   	6: bool value to dictate it uses breadthfirst search technique instead of the default depthfirst
   */
   //prefixer wants to connect its 'in' port to repeaters 'out'
-  var con1 = network.connect('prefixer','in','repeater','out');
   //repeater wants to connect its 'out' port to cosmo 'in' port;;
-  var con2 = network.connect('repeater','in','cosmo','out',null,true); // this will use breadthfirst search instead of depthfirst
-
   //needed due to the nature of network connections using futures
-  Future.wait([con1,con2]).then((_){
+  network
+  .connect('prefixer','in','repeater','out')
+  .connect('repeater','in','cosmo','out',null,true).whenConnectionCompletes((_){
 	//its not always necessary for a networks in and outports to be connect,but there are cases eg composite components
 	  //where data must be fed into the network for its components to process
 	  
@@ -92,6 +91,8 @@ void main(){
 	  rep2.port('out').bindPort(network.nout);
 
 	  network.boot();
+  },(e){
+  	throws e;
   });
   
 

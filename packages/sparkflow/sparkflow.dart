@@ -705,6 +705,44 @@ class IIPMeta{
     }
 }
 
+class FutureCompiler{
+  ds.dsList<Future> futures;
+  var futureIterator;
+
+  static create([n]) => new FutureCompiler(n);
+
+  FutureCompiler([int n]){
+    this.futures = ds.dsList.create(n);
+    this.futureIterator = this.futures.iterator;
+  }
+
+  void add(Future n){
+    this.futures.add(n);
+  }
+
+  void clear(){
+    this.futures.clear();
+  }
+
+  List generateFutureList(){
+    var list = new List();
+    this.futureIterator.cascade((it){
+      list.add(it.current);
+    },(it){
+       this.clear();
+    });
+
+    return list;
+  }
+
+  Future whenComplete(Function n,[Function err]){
+    var wait = Future.wait(this.generateFutureList()).then(n);
+    if(err != null) wait.catchError(err);
+    return wait;
+  }
+
+}
+
 class Network extends FlowNetwork{
   //timestamps
   var startStamp,stopStamp;
@@ -734,6 +772,10 @@ class Network extends FlowNetwork{
   final IIPSockets = ds.dsList.create();
   // list of initial packets to sent out on boot
   final IIPackets = ds.dsList.create();
+  //connection compiler for connection usage;
+  final connectionsCompiler = FutureCompiler.create();
+  //disconnection compiler for disconnection usage
+  final disconnectionsCompiler = FutureCompiler.create();
   //the graph depthfirst filters
   final ds.GraphFilter dfFilter = new ds.GraphFilter.depthFirst((key,node,arc){
       if(node.data.uuid == key) return node;
@@ -920,13 +962,21 @@ class Network extends FlowNetwork{
     });
   }
 
-  Future connect(String a,String aport,String b, String bport,[String sockid,bool bf]){
-    if(!this.uuidRegister.has(a)) return;
-    if(!this.uuidRegister.has(b)) return;
+  Future whenConnectionCompletes(Function n,[Function err]){
+    return this.connectionsCompiler.whenComplete(n,err);
+  }
+
+  Future whenDisconnectionCompletes(Function n,[Function err]){
+    return this.disconnectionsCompiler.whenComplete(n,err);
+  }
+
+  Network connect(String a,String aport,String b, String bport,[String sockid,bool bf]){
+    if(!this.uuidRegister.has(a)) return null;
+    if(!this.uuidRegister.has(b)) return null;
 
     var comso = this.filter(a,bf);
     var comsa = this.filter(b,bf);
-    return Future.wait([comso,comsa]).then((_){
+    var waiter = Future.wait([comso,comsa]).then((_){
       var from = _[0], to = _[1];
       from.data.bind(aport,to.data,bport,sockid);
       this.components.bind(from,to,2);
@@ -935,15 +985,18 @@ class Network extends FlowNetwork{
     }).catchError((e){
       this.errorStream.send({'type':'network-connect', 'error': e, 'from': a, 'to': b});
     });
+
+    this.connectionsCompiler.add(waiter);
+    return this;
   }
 
-  Future disconnect(String a,String aport,String b,[String bport,String sockid,bool bf]){
-    if(!this.uuidRegister.has(a)) return;
-    if(!this.uuidRegister.has(b)) return;
+  Network disconnect(String a,String aport,String b,[String bport,String sockid,bool bf]){
+    if(!this.uuidRegister.has(a)) return null;
+    if(!this.uuidRegister.has(b)) return null;
 
     var comso = this.filter(a,bf);
     var comsa = this.filter(b,bf);
-    return Future.wait([comso,comsa]).then((_){
+    var wait =  Future.wait([comso,comsa]).then((_){
       var from = _[0], to = _[1];
       from.data.unbind(aport,to.data,bport,sockid);
       this.components.unbind(from,to,2);
@@ -952,6 +1005,9 @@ class Network extends FlowNetwork{
     }).catchError((e){
       this.errorStream.send({'type':'network-disconnect', 'error': e, 'from': a, 'to': b});
     });
+
+    this.disconnectionsCompiler.add(wait);
+    return this;
   }
   
   Future linkOut(String com,String comport,[bool bf]){
