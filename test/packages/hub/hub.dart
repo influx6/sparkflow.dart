@@ -19,6 +19,10 @@ class Transformable{
     this._transformer = n;
   }
 
+  void changeFn(Function n){
+    this._transformer = n;
+  }
+
   void change(dynamic n){
     this._bind = n;
   }
@@ -487,6 +491,8 @@ class Counter{
   num _count = 0;
   dynamic handler;
   
+  static create(n) => new Counter(n);
+
   Counter(this.handler);
   
   num get counter => _count;
@@ -693,7 +699,60 @@ class Hub{
     });
     
   }
-	
+
+	 static void eachAsyncMap(Map a,Function iterator,[Function complete]){
+	    if(a.length <= 0){
+	      if(complete != null) complete(a);
+	      return null;    
+	    }
+	    
+	    var total = a.length;
+	    
+	    a.forEach((f,v){
+	      iterator(v,f,a,(err){
+          if(err){
+            if(complete != null) complete(a);
+            return null;
+          }
+          total -= 1;
+          if(total <= 0){
+            if(complete != null) complete(a);
+            return null;
+          }
+      });  
+    });
+    
+  }
+	 
+  static void eachSyncMap(Map a,Function iterator, [Function complete]){
+    if(a.length <= 0){
+      if(complete != null) complete(a);
+      return null;    
+    }
+    
+    var keys = a.keys.toList();
+    var total = a.length,step = 0,tapper;
+        
+    var fuse = (){
+      var key = keys[step];
+      iterator(a[key],key,a,(err){
+        if(err){
+          if(complete != null) complete(a);
+          return null;
+        }
+        step += 1;
+        if(step == total){
+          if(complete != null) complete(a);
+           return null;
+        }else return tapper();
+      });
+    };
+     
+    tapper = (){ return fuse(); };
+
+    return fuse();
+  }
+  
 	static void eachSync(List a,Function iterator, [Function complete]){
 	  if(a.length <= 0){
       if(complete != null) complete(a);

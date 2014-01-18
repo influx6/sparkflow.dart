@@ -1,4 +1,4 @@
-library sparkflow.utils;
+library sparkflow.components;
 
 import 'package:hub/hub.dart';
 import 'package:sparkflow/sparkflow.dart';
@@ -17,6 +17,8 @@ class Repeater extends Component{
 class Prefixer extends Component{
   Transformable _combinator;
   
+  static create(m,[n]) => new Prefixer(m,n);
+ 
   Prefixer(Function n,[String id]): super((id == null ? "Prefixer" : id)){
     this._combinator = Transformable.create(n);
     this.meta('desc','prefixing a value to a IP');

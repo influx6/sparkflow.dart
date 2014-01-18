@@ -1,7 +1,7 @@
 library sparkflow;
 
 import 'dart:async';
-import 'package:hub/hub.dart';
+import 'package:hub/hub.dart' as hub;
 import 'package:streamable/streamable.dart';
 import 'package:ds/ds.dart' as ds;
 import 'package:statemanager/statemanager.dart';
@@ -15,13 +15,10 @@ abstract class FlowAbstract{
 }
 
 abstract class FlowSocket{
-	void bind();
-	void unbind();
 	void beginGroup();
 	void endGroup();
 	void send();
 	void close();
-	void attach(FlowPort port,FlowPort m);
 }
 
 /*base class for ports*/
@@ -31,14 +28,13 @@ abstract class FlowPort{
   void beginGroup(data);
   void endGroup(data);
   void disconnect();
-  void attach(FlowPort a);
-  void detach(FlowPort a);
+
 }
 
 abstract class FlowComponent{
-  final ports = new MapDecorator();
-  final alias = new MapDecorator();
-  final metas = new MapDecorator.from({'desc':'basic description'});
+  final alias = new hub.MapDecorator();
+  final metas = new hub.MapDecorator.from({'desc':'basic description'});
+  final ports = new hub.MapDecorator();
 
   FlowComponent(id){
     this.metas.add('id',id);
@@ -81,7 +77,7 @@ abstract class FlowIP{
 }
 
 abstract class FlowNetwork{
-  final metas = new MapDecorator.from({'desc':'Sparkflow Network Graph'});
+  final metas = new hub.MapDecorator.from({'desc':'Sparkflow Network Graph'});
 
 
   FlowNetwork(String id){
@@ -98,8 +94,8 @@ abstract class FlowNetwork{
 }
 
 class SocketStream{
-  final String uuid = Hub.randomString(3);
-  final meta = new MapDecorator();
+  final String uuid = hub.Hub.randomString(3);
+  final meta = new hub.MapDecorator();
   final Streamable data = Streamable.create();  
   final Streamable end = Streamable.create();  
   final Streamable begin = Streamable.create();
@@ -215,7 +211,9 @@ final portFilter = (i,n){
 };
 
 class Socket extends FlowSocket{
-  final String uuid = Hub.randomString(5);
+  final Distributor continued = Distributor.create('streamable-streamcontinue');
+  final Distributor halted = Distributor.create('streamable-streamhalt');
+  final String uuid = hub.Hub.randomString(5);
   final ds.dsList subscribers = ds.dsList.create();
   SocketStream streams;
   FlowPort from,to;
@@ -243,6 +241,22 @@ class Socket extends FlowSocket{
   dynamic get endGroupDrained => this.streams.endGroupDrained;
   dynamic get beginGroupDrained => this.streams.beginGroupDrained;
   dynamic get streamDrained => this.streams.streamDrained;
+
+  void whenHalted(Function m){
+    this.halted.on(m);
+  }
+
+  void whenHaltedOnce(Function m){
+    this.halted.once(m);
+  }
+
+  void whenContinued(Function m){
+    this.continued.on(m);
+  }
+
+  void whenContinuedOnce(Function m){
+    this.continued.once(m);
+  }
 
   void metas(String key,[dynamic v]){
     this.streams.metas(key,v);
@@ -293,21 +307,24 @@ class Socket extends FlowSocket{
   
   dynamic attachPort(FlowPort a){
     var sub = this.bindSocket(a.socket);
+    if(sub == null) return null;
     sub.port = a;
     return sub;
   }
 
   dynamic detachPort(FlowPort a){
     var sock = this.filter.remove(a,null,portFilter).data;
+    if(sock == null) return null;
     if(sock.socket != null) sock.socket = null;
     if(sock.port != null) sock.port = null;
-    sock.close();
+    sock.close(true);
     return sock;
   }
   
   dynamic detachTo(){
     if(this.to != null) return null;
     var sub = this.unbindSocket(this.to.socket);
+    if(sub == null) return null;
     this.to = null;
     return sub;
   }
@@ -322,10 +339,11 @@ class Socket extends FlowSocket{
   }
   
   dynamic unbindSocket(Socket a){
+    if(!this.filter.has(a,socketFilter)) return null;
     var sub = this.filter.remove(a,null,socketFilter).data;
     if(sub.socket != null) sub.socket = null;
     //if(sub.port != null) sub.port = null;
-    sub.close();
+    sub.close(true);
     return sub;
   }
   
@@ -339,10 +357,12 @@ class Socket extends FlowSocket{
 
   void connect(){
     this.streams.stream.resume();
+    this.continued.emit(true);
   }
   
   void disconnect(){
     this.streams.stream.pause();
+    this.halted.emit(true);
   }
 
   void beginGroup([group]){
@@ -380,7 +400,8 @@ final aliasFilterFn = (it,n){
 
 /*the channel for IP transmission on a component*/
 class Port extends FlowPort{
-  final String uuid = Hub.randomString(5);
+  final String uuid = hub.Hub.randomString(5);
+  hub.Counter counter;
   Map aliases = new Map();
   FlowSocket socket;
   dynamic aliasFilter;
@@ -390,6 +411,7 @@ class Port extends FlowPort{
 
   Port(this.id,[cid]):super(){
     this.componentID = cid;
+    this.counter = hub.Counter.create(this);
     this.socket = Socket.create(this);
     this.aliasFilter = socket.subscribers.iterator;
   }
@@ -428,46 +450,86 @@ class Port extends FlowPort{
   }
 
   dynamic bindPort(FlowPort a,[String alias]){
+    this.checkAliases();
     var sub = this.socket.attachPort(a);
-    sub.alias = (alias == null ? '*' : alias);
+    if(sub == null) return null;
+    this.counter.tick();
+    var id = (alias == null ? this.counter.counter : alias).toString();
+    sub.alias = id;
+    this.aliases[id]= sub;
+    return sub;
+
+  }
+
+  dynamic bindSocket(Socket v,[String alias]){
+    this.checkAliases();
+    var sub = this.socket.bindSocket(v);
+    if(sub == null) return null;
+    var id = (alias == null ? this.counter.tick() : alias).toString();
+    sub.alias = id;
+    this.aliases[id]= sub;
     return sub;
   }
   
   dynamic unbindPort(FlowPort a){
+    this.checkAliases();
     var sub = this.socket.detachPort(a);
+    if(sub == null) return null;
+    print('port unbinding with ${sub.alias}');
+
+    this.removeSocketAlias(sub.alias);
     sub.env.suppressErrors();
     if(sub.alias != null) sub.alias = null;
     sub.env.unsuppressErrors();
+    sub.closeAttributes();
     return sub;
   }
 
   dynamic unbindSocket(Socket v){
+    this.checkAliases();
     var sub = this.socket.unbindSocket(v);
+    if(sub == null) return null;
+    this.removeSocketAlias(sub.alias);
     sub.env.suppressErrors();
     if(sub.alias != null) sub.alias = null;
     sub.env.unsuppressErrors();
+    sub.closeAttributes();
     return sub;
   }
   
-  dynamic bindSocket(Socket v,[String alias]){
-    var sub = this.socket.bindSocket(v);
-    sub.alias = (alias == null ? '*' : alias);
+
+  void checkAliases(){
+    if(this.aliases.isEmpty) this.counter.detonate();
+    return null;
+  }
+  
+  dynamic getAliasOfPort(FlowPort p){
+    return this.getAliasOfSocket(p.socket);
+  }
+  
+  dynamic getAliasOfSocket(FlowSocket v){
+    var  id;
+    hub.Hub.eachSyncMap(this.aliases,(e,i,o,fn){
+      if(e.socket == v){
+        id = i;
+        return fn(true);
+      }
+      return fn(false);
+    });
+    
+    return id;
+  }
+  
+  dynamic getSocketAlias(String alias){
+    var sub = this.aliases[alias];
+    if(sub == null)  return null;
     return sub;
   }
 
-  dynamic getSocketAlias(String alias){
-    var sub = this.aliasFilter.get(alias,aliasFilterFn);
-    if(sub == null)  return null;
-    return sub.data;
-  }
-
   dynamic removeSocketAlias(String alias){
-    var sub = this.aliasFilter.remove(alias,aliasFilterFn);
+    var sub = this.aliases.remove(alias);
     if(sub == null)  return null;
-    if(sub.data.port != null) sub.data.port = null;
-    if(sub.data.socket != null) sub.data.socket = null;
-    if(sub.data.alias != null) sub.data.alias = null;
-    return sub.data;
+    return sub;
   }
 
   void beginGroup(data,[String alias]){
@@ -575,9 +637,9 @@ class Network extends FlowNetwork{
   //network StateManager
   var stateManager;
   // map of uuid registers with either unique names or uuid
-  final uuidRegister = new MapDecorator();
+  final uuidRegister = new hub.MapDecorator();
   //uuid of network
-  final String uuid = Hub.randomString(5);
+  final String uuid = hub.Hub.randomString(5);
   //final outport for the particular network,optionally usable
   final Port nout = Port.create('networkOutport');
   //final inport for the particular network,optionally usable
@@ -610,7 +672,7 @@ class Network extends FlowNetwork{
    this.bfFilter.use(this.components);
    // this.graphIterator = this.components.iterator;
    this.IIPSocketFilter = this.IIPSockets.iterator;
-   this.placeholder = this.components.add(PlaceHolder.create('placeholder',Hub.randomString(7)));
+   this.placeholder = this.components.add(PlaceHolder.create('placeholder',hub.Hub.randomString(7)));
    this.uuidRegister.add('placeholder',this.placeholder.data.uuid);
    this.stateManager = StateManager.create(this);
 
@@ -901,7 +963,7 @@ class Network extends FlowNetwork{
 
 /*class for component*/
 class Component extends FlowComponent{
-  final String uuid = Hub.randomString(7);
+  final String uuid = hub.Hub.randomString(7);
   var network;
 
   
@@ -999,9 +1061,9 @@ class Component extends FlowComponent{
 }
 
 class SparkFlow extends FlowAbstract{
-  final metas = new MapDecorator.from({'desc':'top level flowobject'});
+  final metas = new hub.MapDecorator.from({'desc':'top level flowobject'});
   final Network network;
-  MapDecorator tree = new MapDecorator();
+  var tree = new hub.MapDecorator();
 
   static create(String id,[String desc]) => new SparkFlow(id,desc);
 
@@ -1052,8 +1114,8 @@ class SparkFlow extends FlowAbstract{
 
 }
 
-class MassTree extends MapDecorator{
-  final canDestroy = Switch.create();
+class MassTree extends hub.MapDecorator{
+  final canDestroy = hub.Switch.create();
 
   static create() => new MassTree();
 

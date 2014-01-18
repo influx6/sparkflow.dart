@@ -29,9 +29,10 @@ void main(){
 	fromPort.send('my');
 	fromPort.send('people');
 
+	print(fromPort.getAliasOfPort(toPort));
 	fromPort.unbindPort(toPort);
 
 	fromPort.send('!');
-
+  
 
 }

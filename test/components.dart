@@ -6,7 +6,7 @@ import 'package:sparkflow/components/repeater.dart';
 void main(){
   
   var repeater = Repeater.create();
-  var prefixer = Prefixer.create();
+  var prefixer = StringPrefixer.create();
 
   repeater.renamePort('in','suck');
   repeater.renamePort('out','spill');
@@ -15,7 +15,7 @@ void main(){
   var reader  = Port.create('writer');
   var feeder2  = Port.create('feeder');
   
-  reader.on((n){ print('#log  => $n'); });
+  reader.tap((n){ print('#log  => $n'); });
   
   feeder.bindPort(repeater.port('suck'));
   repeater.port('spill').bindPort(reader);

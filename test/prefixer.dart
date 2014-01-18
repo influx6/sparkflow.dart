@@ -15,7 +15,11 @@ void main(){
   prefixer.port('option').send('tag::');
   
   prefixer.port('in').send('two');
+
   prefixer.port('in').send('three');
+
+  prefixer.port('option').send('rat::');
+
   prefixer.port('in').send('four');
 
 }

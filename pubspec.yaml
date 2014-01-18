@@ -1,7 +1,9 @@
 name: sparkflow
 version: 0.0.1
 author: Alexander Ewetumo
-description: a flow-based approach to app development
+description: "a flow-based approach to app development using a simple expressive fbp\
+  \ api.\r\n\r\nTargets:\r\n\tAPi Complete\r\n\r\nToDo:\r\n\tAdd basic level Componenets\
+  \ eg http,websocket,.."
 homepage: http://github.com/influx6/sparkflow.dart
 dependencies:
   ds:

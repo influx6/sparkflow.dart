@@ -9,11 +9,11 @@ void main(){
   rep1.renamePort('in','suck');
   rep1.renamePort('out','spill');
   
-  var rep2 = Prefixer.create();
+  var rep2 = StringPrefixer.create();
   rep2.renamePort('in','en');
 
-  rep2.option.connect();
-  rep2.option.send('slug::');
+  rep2.port('option').connect();
+  rep2.port('option').send('slug::');
 
   var cosmo = Component.create();
   cosmo.makePort('en');
@@ -26,7 +26,7 @@ void main(){
   rep1.port('spill').attach(rep2.en);
   rep2.port('out').attach(cosmo.out);
   
-  cosmo.out.listen((_){
+  cosmo.port('out').tap((_){
     print('cosmo received: $_');
   });
   

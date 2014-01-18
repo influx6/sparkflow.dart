@@ -440,13 +440,17 @@ class Subscriber<T> extends Listener<T>{
     this.stream.resume();
   }
   
-  void end(){
+  void end([bool noattr]){
    this.stream.end();
-   super.close();
+   if(noattr != null && !noattr) this.closeAttributes();
   }
   
-  void close(){
-    this.end();
+  void closeAttributes(){
+    super.close();  
+  }
+  
+  void close([bool n]){
+    this.end(n);
   }
 }
 
