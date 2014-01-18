@@ -193,6 +193,7 @@ class SocketStream{
     this.meta.add(key,value);
   }
 
+  bool get hasConnections => this.stream.hasListeners;
 }
 
 final socketFilter = (i,n){
@@ -226,6 +227,8 @@ class Socket extends FlowSocket{
     this.filter = this.subscribers.iterator;
     if(from != null) this.attachFrom(from);
   }
+
+  bool get hasConnections => this.streams.hasConnections;
 
   dynamic get dataStream => this.streams.data;
   dynamic get endGroupStream => this.streams.end;
@@ -336,7 +339,6 @@ class Socket extends FlowSocket{
 
   dynamic bindSocket(Socket a){
     if(this.filter.has(a,socketFilter)) return null;
-    
     var sub = this.streams.stream.subscribe(a.send);
     sub.socket = a;
     this.subscribers.add(sub);
@@ -425,6 +427,8 @@ class Port extends FlowPort{
     this._bgtransformer = this.beginGroupStream.cloneTransformer();
     this._dttransformer = this.dataStream.cloneTransformer();
   }
+
+  bool get hasConnections => this.socket.hasConnections;
 
   dynamic get dataStream => this.socket.dataStream;
   dynamic get endGroupStream => this.socket.endGroupStream;
@@ -646,17 +650,13 @@ class Port extends FlowPort{
 }
 
 final IIPFilter = (it,n){
-  if(it.current['uuid'] == n) return true;
+  if(it.current.uuid == n) return true;
   return false;
 };
 
-final IIPDataFilter = (it,n,Function m){
-  var i = 0;
-  for(; i < it.length; i++){
-    if(it[i]['uuid'] != n) continue;
-    break;
-  }
-  return m(it[i],i,it);
+final IIPDataFilter = (it,n){
+  if(it.current['uuid'] != n) return false;
+  return true;
 };
 
 class PlaceHolder{
@@ -667,11 +667,49 @@ class PlaceHolder{
   PlaceHolder(this.id,this.uuid);
 }
 
+class IIPMeta{
+    final Map meta = new Map();
+
+    static create(u,a,s,c) => new IIPMeta(u,a,s,c);
+
+    IIPMeta(uuid,alias,socket,component){
+      this.meta['uuid'] = uuid;
+      this.meta['socket'] = socket;
+      this.meta['alias'] = alias;
+      this.meta['component'] = component;
+    }
+
+    dynamic get uuid => meta['uuid'];
+    dynamic get socket => meta['socket'];
+    dynamic get alias => meta['alias'];
+    dynamic get component => meta['component'];
+
+    void eraseUUID(){ this.meta['uuid'] = ''; }
+    void eraseSocket(){ 
+      if(this.meta['socket'] != null) this.meta['socket'].end(); 
+      this.meta['socket'] = null; 
+    }
+    void eraseAlias(){ this.meta['alias'] = ''; }
+    void eraseComponent(){ this.meta['component'] = null; }
+
+    void selfDestruct(){
+      this.eraseSocket();
+      this.eraseComponent();
+      this.eraseAlias();
+      this.eraseUUID();
+      this.meta.clear();
+    }
+
+    String toString(){
+      return this.meta.toString();
+    }
+}
+
 class Network extends FlowNetwork{
   //timestamps
   var startStamp,stopStamp;
-  // iterator for the graph
-  var graphIterator;
+  // iterator for the graph and iips
+  var graphIterator, iipDataIterator;
   // initial sockets list iterator
   var IIPSocketFilter;
   //graph node placeholder
@@ -695,7 +733,7 @@ class Network extends FlowNetwork{
   // list of Initial Information Packets
   final IIPSockets = ds.dsList.create();
   // list of initial packets to sent out on boot
-  final IIPackets = new List();
+  final IIPackets = ds.dsList.create();
   //the graph depthfirst filters
   final ds.GraphFilter dfFilter = new ds.GraphFilter.depthFirst((key,node,arc){
       if(node.data.uuid == key) return node;
@@ -714,6 +752,7 @@ class Network extends FlowNetwork{
    this.bfFilter.use(this.components);
    // this.graphIterator = this.components.iterator;
    this.IIPSocketFilter = this.IIPSockets.iterator;
+   this.iipDataIterator = this.IIPackets.iterator;
    this.placeholder = this.components.add(PlaceHolder.create('placeholder',hub.Hub.randomString(7)));
    this.uuidRegister.add('placeholder',this.placeholder.data.uuid);
    this.stateManager = StateManager.create(this);
@@ -790,34 +829,31 @@ class Network extends FlowNetwork{
   dynamic filterIIPSocket(alias,[Function n]){
     var id = this.uuidRegister.get(alias);
     if(id == null) return null;
-    return this.IIPSocketFilter.get(id,IIPFilter).data;
+    var iip = this.IIPSocketFilter.get(id,IIPFilter);
+    if(iip == null) return null;
+    return iip.data;  
   }
 
   dynamic addIIPSocket(Component component,String id,[Function n]){
-    if(this.uuidRegister.has(id)) return null;
+    if(!this.uuidRegister.has(id)) return null;
 
     if(this.filterIIPSocket(id) != null) return null;
 
-    var iip = {};
-    iip['uuid'] = component.uuid;
-    iip['alias'] = id;
-    iip['socket'] = Socket.create();
-    iip['component'] = component;
-
-    if(n != null) n(iip,component);
+    var iip = IIPMeta.create(component.uuid,id,Socket.create(),component);
+    if(n != null) n(iip);
 
     this.IIPSockets.add(iip);
-    this.infoStream.send({ 'type':"addIIPSocket", 'alias':alias,'for': component.UID });
+    this.infoStream.send({ 'message':'adding iip socket for $id','type':"addIIPSocket", 'alias':id,'for': component.UID });
     return iip;
   }
 
   dynamic removeIIPSocket(alias,[Function n]){
+    if(!this.uuidRegister.has(alias)) return null;
     var id = this.uuidRegister.get(alias);
     if(id == null) return null;
     var sock =  this.IIPSocketFilter.remove(id,IIPFilter);
     if(n != null) fn(sock);
-    sock['component'] = sock['alias'] = null;
-    sock['socket'].end();
+    sock.selfDestruct();
     this.infoStream.send({ 'type':"removeIIPSocket", 'alias':alias,'for': component.UID });
     return sock;
   }
@@ -841,24 +877,22 @@ class Network extends FlowNetwork{
     if(!this.uuidRegister.has(alias) || this.isAlive) return null;
 
     var data,uuid = this.uuidRegister.get(alias);
-    IIPDataFilter(this.IIPackets,uuid,(e,i,o){
-        data = e;
-        if(n != null) n(e,i,o);
-        o.removeAt(i);
-    });
+    data = this.iipDataIterator.remove(uuid,IIPDataFilter);
+    if(n != null) n(data);
     this.infoStream.send({ 'type':"removeInitialPacket", 'alias':alias });
     return data;
   }
 
   void sendInitials(){
-    if(this.isAlive || this.IIPackets.length < 0) return null;
-    var len = this.IIPackets.length, i = 0;
-    this.IIPackets.forEach((f){
-      i += 1;
+    if(this.isAlive || this.IIPackets.isEmpty) return null;
+    this.iipDataIterator.cascade((it){
+      var f = it.current;
       var socket = this.filterIIPSocket(f['uuid']);
-      if(socket != null) socket.send(data);
-      if( i >= len) this.IIPackets.clear();
+      if(socket != null) socket.socket.send(f['data']);
+    },(it){
+      this.IIPackets.clear();
     });
+ 
     this.infoStream.send({ 'type':"sendInitials", 'message': 'sending out all initials' });
   }
 
@@ -886,33 +920,35 @@ class Network extends FlowNetwork{
     });
   }
 
-  void connect(String a,String b,String aport, String bport,[String sockid,bool bf]){
+  Future connect(String a,String aport,String b, String bport,[String sockid,bool bf]){
     if(!this.uuidRegister.has(a)) return;
     if(!this.uuidRegister.has(b)) return;
 
     var comso = this.filter(a,bf);
     var comsa = this.filter(b,bf);
-    Future.wait([comso,comsa]).then((_){
+    return Future.wait([comso,comsa]).then((_){
       var from = _[0], to = _[1];
       from.data.bind(aport,to.data,bport,sockid);
       this.components.bind(from,to,2);
       this.infoStream.send({ 'type':"connectComponent", 'from': a, 'to': b,'message': 'connecting two component','uuid':'','alias':''});
+      return _;
     }).catchError((e){
       this.errorStream.send({'type':'network-connect', 'error': e, 'from': a, 'to': b});
     });
   }
 
-  void disconnect(String a,String b,String aport,[String bport,String sockid,bool bf]){
+  Future disconnect(String a,String aport,String b,[String bport,String sockid,bool bf]){
     if(!this.uuidRegister.has(a)) return;
     if(!this.uuidRegister.has(b)) return;
 
     var comso = this.filter(a,bf);
     var comsa = this.filter(b,bf);
-    Future.wait([comso,comsa]).then((_){
+    return Future.wait([comso,comsa]).then((_){
       var from = _[0], to = _[1];
       from.data.unbind(aport,to.data,bport,sockid);
       this.components.unbind(from,to,2);
       this.infoStream.send({ 'type':"disconnectComponent", 'from': a, 'to': b,'message': 'connecting two component','uuid':'','alias':''});
+      return _;
     }).catchError((e){
       this.errorStream.send({'type':'network-disconnect', 'error': e, 'from': a, 'to': b});
     });
@@ -1014,10 +1050,10 @@ class Component extends FlowComponent{
   Component([String id]): super((id == null ? 'Component' : id)){
     this.network = Network.create(this.id+'-Subnet');
 
-    this.ports.add('option',Port.create('option'));
-    this.ports.add('in',Port.create('in'));
-    this.ports.add('err',Port.create('err'));
-    this.ports.add('out',Port.create('out'));
+    this.ports.add('option',Port.create('option',this.id));
+    this.ports.add('in',Port.create('in',this.id));
+    this.ports.add('err',Port.create('err',this.id));
+    this.ports.add('out',Port.create('out',this.id));
 
     this.alias.add('in','in');
     this.alias.add('out','out');
@@ -1067,7 +1103,7 @@ class Component extends FlowComponent{
 
   FlowPort makePort(String id,[Port p,bool override]){
     if(this.alias.has(id) && (!override || override == null)) return null;
-    var port = (p == null ? Port.create(id) : p);
+    var port = (p == null ? Port.create(id,this.id) : p);
     if(override != null && !!override) this.ports.update(this.alias.get(id),port);
     else{
       this.alias.add(id,id);
