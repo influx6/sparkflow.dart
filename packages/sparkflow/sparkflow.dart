@@ -732,6 +732,7 @@ class FutureCompiler{
        this.clear();
     });
 
+    if(list.length <= 0) list.add(new Future.value(true));
     return list;
   }
 
@@ -744,6 +745,8 @@ class FutureCompiler{
 }
 
 class Network extends FlowNetwork{
+  //global futures of freze,boot,shutdown
+  Future _whenAlive,_whenFrozen,_whenDead;
   //timestamps
   var startStamp,stopStamp;
   // iterator for the graph and iips
@@ -841,6 +844,10 @@ class Network extends FlowNetwork{
     this.errorStream.close();
     this.infoStream.close();
   }
+
+  Future get whenAlive => this._whenAlive;
+  Future get whenDead => this._whenDead;
+  Future get whenFrozen => this._whenFrozen;
 
   Future filter(String m,[bool bf]){
     var bff = (bf == null ? false : bf);
@@ -962,13 +969,6 @@ class Network extends FlowNetwork{
     });
   }
 
-  Future whenConnectionCompletes(Function n,[Function err]){
-    return this.connectionsCompiler.whenComplete(n,err);
-  }
-
-  Future whenDisconnectionCompletes(Function n,[Function err]){
-    return this.disconnectionsCompiler.whenComplete(n,err);
-  }
 
   Network connect(String a,String aport,String b, String bport,[String sockid,bool bf]){
     if(!this.uuidRegister.has(a)) return null;
@@ -1027,51 +1027,87 @@ class Network extends FlowNetwork{
   }
 
   Future freeze(){
-    if(this.isFrozen && this.isDead) return new Future.value(false);
-    var future;
-    this.components.cascade((it){
-        if(it.current.data == this.placeholder.data) return;
-        it.current.data.freeze();
-    },(it){
-      future = new Future.value(true);
+    if(this.isFrozen && this._whenFrozen != null) return this.whenFrozen;
+
+    var completer = new Completer();
+    this._whenFrozen = this.connectionsCompiler.whenComplete((_){
+
+      if(this.isFrozen || this.isDead){
+         completer.complete(this);
+         return completer.future;
+      }
+
+      this.components.cascade((it){
+          if(it.current.data == this.placeholder.data) return;
+          it.current.data.freeze();
+      },(it){
+        completer.complete(this);
+      });
+
+      this.stateManager.switchState('frozen');
+      this.infoStream.send({ 'type':"freezeNetwork", 'message': 'freezing/pausing network operations'});
+      this.lockNetworkStreams();
+      return completer.future;
     });
-    this.stateManager.switchState('frozen');
-    this.infoStream.send({ 'type':"freezeNetwork", 'message': 'freezing/pausing network operations'});
-    this.lockNetworkStreams();
-    return (future == null ? new Future.value(true) : future);
+
+    return this.whenFrozen;
   }
 
   Future shutdown(){
-    if(this.isDead) return new Future.value(false);
-    var future;
-    this.components.cascade((it){
-        if(it.current.data == this.placeholder.data) return;
-        it.current.data.shutdown();
-    },(it){
-      future = new Future.value(true);
+    if(this.isDead && this._whenDead != null) return this.whenDead;
+
+    var completer = new Completer();
+    this._whenDead = this.disconnectionsCompiler.whenComplete((_){
+
+        if(this.isDead){
+         completer.complete(this);
+         return completer.future;
+        }
+
+        this.components.cascade((it){
+            if(it.current.data == this.placeholder.data) return;
+            it.current.data.shutdown();
+        },(it){
+          completer.complete(this);
+        });
+        this.stateManager.switchState('dead');
+        this.infoStream.send({ 'type':"shutdownNetwork", 'message': 'shutting down/killing network operations'});
+        this.stopStamp = new DateTime.now();
+
+        return completer.future;
     });
-    this.stateManager.switchState('dead');
-    this.infoStream.send({ 'type':"shutdownNetwork", 'message': 'shutting down/killing network operations'});
-    this.stopStamp = new DateTime.now();
-    return (future == null ? new Future.value(true) : future);
+
+    return this.whenDead;
   }
 
   Future boot(){
-    if(this.isAlive) return new Future.value(false);
-    var future;
-    if(this.isFrozen || this.isDead){
-      this.components.cascade((it){
-        if(it.current.data == this.placeholder.data) return;
-        it.current.data.boot();
-      },(it){
-        future = new Future.value(true);
-      });
-    }
-    this.sendInitials();
-    this.stateManager.switchState('alive');
-    this.infoStream.send({ 'type':"bootingNetwork", 'message': 'booting network operations'});
-    this.unlockNetworkStreams();
-    this.startStamp = new DateTime.now();
+    if(this.isAlive && this._whenAlive != null) return this.whenAlive;
+
+    var completer = new Completer();
+    this._whenAlive = this.connectionsCompiler.whenComplete((_){
+
+      if(this.isAlive){
+         completer.complete(this);
+         return completer.future;
+      }
+
+      if(this.isFrozen || this.isDead){
+        this.components.cascade((it){
+          if(it.current.data == this.placeholder.data) return;
+          it.current.data.boot();
+        },(it){
+          completer.complete(this);
+        });
+      }
+      this.sendInitials();
+      this.stateManager.switchState('alive');
+      this.infoStream.send({ 'type':"bootingNetwork", 'message': 'booting network operations'});
+      this.unlockNetworkStreams();
+      this.startStamp = new DateTime.now();
+
+      return completer.future;
+    });
+
     return (future == null ? new Future.value(true) : future);
   }
 
