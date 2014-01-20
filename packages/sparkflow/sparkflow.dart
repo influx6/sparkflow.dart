@@ -910,13 +910,13 @@ class Network extends FlowNetwork{
   dynamic addInitial(alias,data){
     if(!this.uuidRegister.has(alias)) return null;
 
-    if(this.isDead || this.isFozen){
+    if(this.isDead || this.isFrozen){
         this.infoStream.send({ 'type':"addInitialPacket", 'alias':alias });
         return this.IIPackets.add({ 'uuid': alias, 'data': data});
-    }
+    };
 
     var socket = this.filterIIPSocket(alias);
-    if(socket != null) socket['socket'].send(data);
+    if(socket != null) socket.socket.send(data);
 
     this.infoStream.send({ 'type':"addInitialPacket", 'alias':alias });
     return socket;
@@ -1048,7 +1048,7 @@ class Network extends FlowNetwork{
       this.infoStream.send({ 'type':"freezeNetwork", 'message': 'freezing/pausing network operations'});
       this.lockNetworkStreams();
       return completer.future;
-    });
+    },(e){ throw e; });
 
     return this.whenFrozen;
   }
@@ -1075,7 +1075,7 @@ class Network extends FlowNetwork{
         this.stopStamp = new DateTime.now();
 
         return completer.future;
-    });
+    },(e){ throw e; });
 
     return this.whenDead;
   }
@@ -1085,6 +1085,8 @@ class Network extends FlowNetwork{
 
     var completer = new Completer();
     this._whenAlive = this.connectionsCompiler.whenComplete((_){
+
+      // var pack = {'components':_,'network':this};
 
       if(this.isAlive){
          completer.complete(this);
@@ -1099,6 +1101,7 @@ class Network extends FlowNetwork{
           completer.complete(this);
         });
       }
+
       this.sendInitials();
       this.stateManager.switchState('alive');
       this.infoStream.send({ 'type':"bootingNetwork", 'message': 'booting network operations'});
@@ -1106,9 +1109,9 @@ class Network extends FlowNetwork{
       this.startStamp = new DateTime.now();
 
       return completer.future;
-    });
+    },(e){ throw e; });
 
-    return (future == null ? new Future.value(true) : future);
+    return this.whenAlive;
   }
 
 

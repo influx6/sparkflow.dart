@@ -43,8 +43,9 @@ void main(){
   //needed due to the nature of network connections using futures
   network
   .connect('prefixer','in','repeater','out')
-  .connect('repeater','in','cosmo','out',null,true).whenConnectionCompletes((_){
-  	// print('got: $_');
+  .connect('repeater','in','cosmo','out',null,true).boot().then((_){
+    print(_);
+    assert(_ == network);
 	  //its not always necessary for a networks in and outports to be connect,but there are cases eg composite components
 	  //where data must be fed into the network for its components to process
 	      
@@ -88,14 +89,21 @@ void main(){
 
 	  rep2.port('out').bindPort(network.nout);
 
-	  network.boot();
-
  	  network.nin.send('sanction'); 
-
-  },(e){
-  	throws e;
+    
+ 	  return _;
+  }).catchError((e){
+  	throw e;
   });
   
+  network.whenAlive.then((_){
+    network.freeze();
+    
+    network.whenFrozen.then((_){
+      network.nin.send('frozen!');
+      network.boot();
+    });
+    
+  });
 
 }
-
