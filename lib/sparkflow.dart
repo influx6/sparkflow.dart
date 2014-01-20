@@ -746,7 +746,7 @@ class FutureCompiler{
 
 class Network extends FlowNetwork{
   //global futures of freze,boot,shutdown
-  Future _whenAlive,_whenFrozen,_whenDead;
+  Completer _whenAlive,_whenFrozen,_whenDead;
   //timestamps
   var startStamp,stopStamp;
   // iterator for the graph and iips
@@ -845,9 +845,9 @@ class Network extends FlowNetwork{
     this.infoStream.close();
   }
 
-  Future get whenAlive => this._whenAlive;
-  Future get whenDead => this._whenDead;
-  Future get whenFrozen => this._whenFrozen;
+  Future get whenAlive => this._whenAlive.future;
+  Future get whenDead => this._whenDead.future;
+  Future get whenFrozen => this._whenFrozen.future;
 
   Future filter(String m,[bool bf]){
     var bff = (bf == null ? false : bf);
@@ -1029,8 +1029,8 @@ class Network extends FlowNetwork{
   Future freeze(){
     if(this.isFrozen && this._whenFrozen != null) return this.whenFrozen;
 
-    var completer = new Completer();
-    this._whenFrozen = this.connectionsCompiler.whenComplete((_){
+    var completer = this._whenFrozen = new Completer();
+    this.connectionsCompiler.whenComplete((_){
 
       if(this.isFrozen || this.isDead){
          completer.complete(this);
@@ -1056,8 +1056,8 @@ class Network extends FlowNetwork{
   Future shutdown(){
     if(this.isDead && this._whenDead != null) return this.whenDead;
 
-    var completer = new Completer();
-    this._whenDead = this.disconnectionsCompiler.whenComplete((_){
+    var completer = this._whenDead = new Completer();
+    this.disconnectionsCompiler.whenComplete((_){
 
         if(this.isDead){
          completer.complete(this);
@@ -1083,8 +1083,8 @@ class Network extends FlowNetwork{
   Future boot(){
     if(this.isAlive && this._whenAlive != null) return this.whenAlive;
 
-    var completer = new Completer();
-    this._whenAlive = this.connectionsCompiler.whenComplete((_){
+    var completer = this._whenAlive = new Completer();
+    this.connectionsCompiler.whenComplete((_){
 
       // var pack = {'components':_,'network':this};
 

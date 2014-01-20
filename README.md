@@ -8,7 +8,7 @@
 	back in the hay days of computer evolution. Though not eager adopted due to the madness for the conventions 
 	at the time,it still has proven it self most vital and has brough new life into how we think and developed.
 	
-	Other systems exists which bring this old approach back to where it should me,such as:
+	Other systems exists which bring this old approach back to where it should be,such as:
 	- NoFlo <noflojs.org> (Javascript implementation of FBP taking the world by storm)
 	- Goflow (Golang version of FBP)
 	- Microflo <http://www.jonnor.com/2013/11/microflo-0-2-0-visual-arduino-programming/>

@@ -44,7 +44,6 @@ void main(){
   network
   .connect('prefixer','in','repeater','out')
   .connect('repeater','in','cosmo','out',null,true).boot().then((_){
-    print(_);
     assert(_ == network);
 	  //its not always necessary for a networks in and outports to be connect,but there are cases eg composite components
 	  //where data must be fed into the network for its components to process
@@ -99,6 +98,8 @@ void main(){
   network.whenAlive.then((_){
     network.freeze();
     
+    network.addInitial('prefixer','pre::');
+   
     network.whenFrozen.then((_){
       network.nin.send('frozen!');
       network.boot();
