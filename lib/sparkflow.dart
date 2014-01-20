@@ -706,7 +706,7 @@ class IIPMeta{
 }
 
 class FutureCompiler{
-  ds.dsList<Future> futures;
+  ds.dsList<Function> futures;
   var futureIterator;
 
   static create([n]) => new FutureCompiler(n);
@@ -716,7 +716,7 @@ class FutureCompiler{
     this.futureIterator = this.futures.iterator;
   }
 
-  void add(Future n){
+  void add(Function n){
     this.futures.add(n);
   }
 
@@ -727,7 +727,7 @@ class FutureCompiler{
   List generateFutureList(){
     var list = new List();
     this.futureIterator.cascade((it){
-      list.add(it.current);
+      list.add(it.current());
     },(it){
        this.clear();
     });
@@ -737,7 +737,7 @@ class FutureCompiler{
 
   Future whenComplete(Function n,[Function err]){
     var wait = Future.wait(this.generateFutureList()).then(n);
-    if(err != null) wait.catchError(err);
+    if(err != null ) wait.catchError(err);
     return wait;
   }
 
@@ -974,17 +974,19 @@ class Network extends FlowNetwork{
     if(!this.uuidRegister.has(a)) return null;
     if(!this.uuidRegister.has(b)) return null;
 
-    var comso = this.filter(a,bf);
-    var comsa = this.filter(b,bf);
-    var waiter = Future.wait([comso,comsa]).then((_){
-      var from = _[0], to = _[1];
-      from.data.bind(aport,to.data,bport,sockid);
-      this.components.bind(from,to,2);
-      this.infoStream.send({ 'type':"connectComponent", 'from': a, 'to': b,'message': 'connecting two component','uuid':'','alias':''});
-      return _;
-    }).catchError((e){
-      this.errorStream.send({'type':'network-connect', 'error': e, 'from': a, 'to': b});
-    });
+    var waiter = (){
+      var comso = this.filter(a,bf);
+      var comsa = this.filter(b,bf);
+      return Future.wait([comso,comsa]).then((_){
+          var from = _[0], to = _[1];
+          from.data.bind(aport,to.data,bport,sockid);
+          this.components.bind(from,to,2);
+          this.infoStream.send({ 'type':"connectComponent", 'from': a, 'to': b,'message': 'connecting two component','uuid':'','alias':''});
+          return _;
+        }).catchError((e){
+          this.errorStream.send({'type':'network-connect', 'error': e, 'from': a, 'to': b});
+      });
+    }; 
 
     this.connectionsCompiler.add(waiter);
     return this;
@@ -994,17 +996,19 @@ class Network extends FlowNetwork{
     if(!this.uuidRegister.has(a)) return null;
     if(!this.uuidRegister.has(b)) return null;
 
-    var comso = this.filter(a,bf);
-    var comsa = this.filter(b,bf);
-    var wait =  Future.wait([comso,comsa]).then((_){
-      var from = _[0], to = _[1];
-      from.data.unbind(aport,to.data,bport,sockid);
-      this.components.unbind(from,to,2);
-      this.infoStream.send({ 'type':"disconnectComponent", 'from': a, 'to': b,'message': 'connecting two component','uuid':'','alias':''});
-      return _;
-    }).catchError((e){
-      this.errorStream.send({'type':'network-disconnect', 'error': e, 'from': a, 'to': b});
-    });
+    var wait = (){
+      var comso = this.filter(a,bf);
+      var comsa = this.filter(b,bf);
+      return  Future.wait([comso,comsa]).then((_){
+        var from = _[0], to = _[1];
+        from.data.unbind(aport,to.data,bport,sockid);
+        this.components.unbind(from,to,2);
+        this.infoStream.send({ 'type':"disconnectComponent", 'from': a, 'to': b,'message': 'connecting two component','uuid':'','alias':''});
+        return _;
+      }).catchError((e){
+        this.errorStream.send({'type':'network-disconnect', 'error': e, 'from': a, 'to': b});
+      });
+    };
 
     this.disconnectionsCompiler.add(wait);
     return this;
@@ -1048,7 +1052,7 @@ class Network extends FlowNetwork{
     });
     this.stateManager.switchState('dead');
     this.infoStream.send({ 'type':"shutdownNetwork", 'message': 'shutting down/killing network operations'});
-    this.stopStamp = new Date.now();
+    this.stopStamp = new DateTime.now();
     return (future == null ? new Future.value(true) : future);
   }
 
@@ -1067,7 +1071,7 @@ class Network extends FlowNetwork{
     this.stateManager.switchState('alive');
     this.infoStream.send({ 'type':"bootingNetwork", 'message': 'booting network operations'});
     this.unlockNetworkStreams();
-    this.startStamp = new Date.now();
+    this.startStamp = new DateTime.now();
     return (future == null ? new Future.value(true) : future);
   }
 

@@ -1,8 +1,6 @@
 library flow.specs;
 
-import 'dart:async';
 import 'package:sparkflow/sparkflow.dart';
-import 'package:hub/hub.dart';
 import 'package:sparkflow/components/repeater.dart';
 
 void main(){
@@ -46,9 +44,10 @@ void main(){
   network
   .connect('prefixer','in','repeater','out')
   .connect('repeater','in','cosmo','out',null,true).whenConnectionCompletes((_){
-	//its not always necessary for a networks in and outports to be connect,but there are cases eg composite components
+  	// print('got: $_');
+	  //its not always necessary for a networks in and outports to be connect,but there are cases eg composite components
 	  //where data must be fed into the network for its components to process
-	  
+	      
 	  //we will connect networks in port (nin) to cosmo 'in' port
 	  network.nin.bindPort(cosmo.port('in'));
 	  // tap into networks out port 'nout' to see what comes out
@@ -62,35 +61,37 @@ void main(){
 	  network.addInitial('prefixer','network::');
 
 
-	  // cosmo.port('in').tap((n){
-	  // 	print('cosmo in: $n');
-	  // });
+//	  cosmo.port('in').tap((n){
+//	  	print('cosmo in: $n');
+//	  });
+//
+//	  cosmo.port('out').tap((n){
+//	  	print('cosmo out: $n');
+//	  });
+//
+//	  rep1.port('in').tap((n){
+//	  	print('repeater in: $n');
+//	  });
+//
+//	  rep1.port('out').tap((n){
+//	  	print('repeater out: $n');
+//	  });
+//
+//	  rep2.port('in').tap((n){
+//	  	print('prefixer in: $n');
+//	  });
+//
+//	  rep2.port('out').tap((n){
+//	  	print('prefixer out: $n');
+//	  });
 
-	  // cosmo.port('out').tap((n){
-	  // 	print('cosmo out: $n');
-	  // });
-
-	  // rep1.port('in').tap((n){
-	  // 	print('repeater in: $n');
-	  // });
-
-	  // rep1.port('out').tap((n){
-	  // 	print('repeater out: $n');
-	  // });
-
-	  // rep2.port('in').tap((n){
-	  // 	print('prefixer in: $n');
-	  // });
-
-	  // rep2.port('out').tap((n){
-	  // 	print('prefixer out: $n');
-	  // });
-
-	  network.nin.send('sanction'); 
 
 	  rep2.port('out').bindPort(network.nout);
 
 	  network.boot();
+
+ 	  network.nin.send('sanction'); 
+
   },(e){
   	throws e;
   });

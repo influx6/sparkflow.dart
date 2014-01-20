@@ -127,7 +127,7 @@ class dsList<T> extends dsAbstractList{
 	}
 	
 	void removeAll(){
-      if(this.isEmpty) return;
+    if(this.isEmpty) return;
 	  this.free();
 	  this.head = this.tail = null;
 	}
@@ -159,7 +159,6 @@ class dsList<T> extends dsAbstractList{
 	String toString(){
 	    var buffer = new StringBuffer(),
 	    it = this.iterator;
-	    buffer.write("List::Contents:");
 	    while(it.moveNext()) buffer.write(it.current);
 	    return buffer.toString();
 	}
