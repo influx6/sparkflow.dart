@@ -147,6 +147,18 @@ class SocketStream{
     this.delimited.switchState("no");
     this.state.switchState("unlock");
   }
+
+  void enableFlushing(){
+    this.stream.enableFlushing();  
+  }
+  
+  void disableFlushing(){
+    this.stream.disableFlushing();  
+  }
+  
+  void setMax(int m){
+    this.stream.setMax(m);  
+  }
   
   dynamic get dataTransformer => this.data.transformer;
   dynamic get endGroupTransformer => this.end.transformer;
@@ -228,6 +240,10 @@ class Socket extends FlowSocket{
     if(from != null) this.attachFrom(from);
   }
 
+  void setMax(int m){
+    this.streams.setMax(m);  
+  }
+  
   bool get hasConnections => this.streams.hasConnections;
 
   dynamic get dataStream => this.streams.data;
@@ -250,6 +266,14 @@ class Socket extends FlowSocket{
   dynamic get beginGroupDrained => this.streams.beginGroupDrained;
   dynamic get mixedDrained => this.streams.streamDrained;
 
+  void enableFlushing(){
+    this.streams.enableFlushing();  
+  }
+  
+  void disableFlushing(){
+    this.streams.disableFlushing();  
+  }
+  
   void whenHalted(Function m){
     this.halted.on(m);
   }
@@ -430,6 +454,18 @@ class Port extends FlowPort{
 
   bool get hasConnections => this.socket.hasConnections;
 
+  void enableFlushing(){
+    this.socket.enableFlushing();  
+  }
+  
+  void disableFlushing(){
+    this.socket.disableFlushing();  
+  }
+
+  void setMax(int m){
+    this.socket.setMax(m);  
+  }
+  
   dynamic get dataStream => this.socket.dataStream;
   dynamic get endGroupStream => this.socket.endGroupStream;
   dynamic get beginGroupStream => this.socket.beginGroupStream;
@@ -1029,7 +1065,7 @@ class Network extends FlowNetwork{
   Future freeze(){
     if(this.isFrozen && this._whenFrozen != null) return this.whenFrozen;
 
-    var completer = this._whenFrozen = new Completer();
+    var completer = this._whenFrozen = (this._whenFrozen.isCompleted() ? new Completer() : this._whenFrozen);
     this.connectionsCompiler.whenComplete((_){
 
       if(this.isFrozen || this.isDead){
