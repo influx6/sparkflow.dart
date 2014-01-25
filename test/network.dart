@@ -32,13 +32,7 @@ void main(){
   //listen to info streams for update
   var buffer = new StringBuffer();
   network.infoStream.tap((n){
-    buffer.write('-------------------\n');
-    buffer.write('type: '+ n['type']);
-    buffer.write('\n');
-    buffer.write('message: '+ n['message']);
-    buffer.write('\n');
-
-    print('#Updates: \n${buffer.toString()}');
+    print('#Updates: \n $n \n');
     buffer.clear();
   });
 

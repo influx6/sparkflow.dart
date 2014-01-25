@@ -1,6 +1,6 @@
 library flow.specs;
 
-import 'package:sparkflow/components/repeater.dart';
+import 'package:sparkflow/components/transformers.dart';
 
 void main(){
   

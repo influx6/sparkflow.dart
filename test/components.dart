@@ -1,7 +1,7 @@
 library flow.specs;
 
 import 'package:sparkflow/sparkflow.dart';
-import 'package:sparkflow/components/repeater.dart';
+import 'package:sparkflow/components/transformers.dart';
 
 void main(){
   
@@ -34,5 +34,8 @@ void main(){
   feeder2.send('1');
   feeder2.send('2');
   feeder2.send('4');
+
+  print(repeater.getPortClassList());
+  
 }
 

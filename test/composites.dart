@@ -1,7 +1,7 @@
 library flow.specs;
 
 import 'package:sparkflow/sparkflow.dart';
-import 'package:sparkflow/components/repeater.dart';
+import 'package:sparkflow/components/transformers.dart';
 
 void main(){
   
@@ -103,8 +103,13 @@ void main(){
     network.whenFrozen.then((_){
       network.nin.send('frozen!');
       network.boot();
+      
+      network.infoStream.tap((m){
+        print('update: \n $m \n');
+      });
     });
     
+
   });
 
 }

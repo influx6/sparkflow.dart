@@ -22,7 +22,7 @@ class Prefixer extends Component{
   Prefixer(Function n,[String id]): super((id == null ? "Prefixer" : id)){
     this._combinator = Transformable.create(n);
     this.meta('desc','prefixing a value to a IP');
-    this.makePort('internalBuffer');
+    this.makePort('internalBuffer','in');
     this.init();
   }
 
@@ -55,4 +55,15 @@ class StringPrefixer extends Prefixer{
 
   StringPrefixer() : super((n,k){ return n+k; },"StringPrefixer");
   
+}
+
+class GroupPackets extends Component{
+
+    static create([i]) => new GroupPackets(i);
+    
+    GroupPackets([String id]) : super(Hub.switchUnless(id,'GroupPackets')){
+
+    }
+
+    
 }

@@ -31,7 +31,54 @@ abstract class FlowPort{
 
 }
 
+abstract class MessageRuntime{
+  final options = hub.Hub.createMapDecorator();
+  Streamable errMessages,outMessages,inMessages;
+  dynamic root;
+
+  //static create(m,[tf]) => new PostMessageRuntime(m,tf);
+
+  MessageRuntime(this.root,[bool catchExceptions]){
+    this.options.add('catchExceptions',(catchExceptions == null ? false : catchExceptions));
+
+    this.outMessages = Streamable.create();
+    this.inMessages = Streamable.create();
+    this.errMessages = sm.Streamable.create();
+
+    this.init();
+  }
+
+  void init(){
+    this.bindOutStream();
+    this.bindInStream();
+    if(!!this.options.get('catchExceptions')) this.bindErrorStream();
+  }
+
+  void send(protocol,command,payload,target,[List ports]){
+    if(payload is Exception){
+      var message = payload.toString();
+      payload = { 'message': message };
+    }
+
+    if(target is Map && !target.containsKey('href')) target['href'] = '*';
+    if(target is String) target = { href: target };
+
+    var data = {
+      'protocol': protocol,
+      'command': command,
+      'payload': payload,
+    };
+    this.outMessages.emit({'target': target, 'message': data, 'ports': ports });
+  }
+
+  void bindInStream();
+  void bindErrorStream();
+  void bindOutStream();
+
+}
+
 abstract class FlowComponent{
+  final List portClass = ['in','out','err','option'];
   final alias = new hub.MapDecorator();
   final metas = new hub.MapDecorator.from({'desc':'basic description'});
   final ports = new hub.MapDecorator();
@@ -60,6 +107,17 @@ abstract class FlowComponent{
   
   void removeMeta(id){
     this.metas.destroy(id);
+  }
+
+  Map getPortClassList(){
+    var sets = {};
+    this.portClass.forEach((n){ sets[n] = new List(); });
+    this.alias.onAll((n,k){
+      var port = this.port(n);
+      sets[port.portClass].add(n);
+    });
+
+    return sets;
   }
 
   String get description => this.metas.get('desc');
@@ -169,6 +227,11 @@ class SocketStream{
   dynamic get endGroupDrained => this.end.drained;
   dynamic get beginGroupDrained => this.begin.drained;
   dynamic get streamDrained => this.stream.drained;
+
+  dynamic get dataInitd => this.data.initd;
+  dynamic get endGroupInitd => this.end.initd;
+  dynamic get beginGroupInitd => this.begin.initd;
+  dynamic get streamInitd => this.stream.initd;
   
   dynamic get dataClosed => this.data.closed;
   dynamic get endGroupClosed => this.end.closed;
@@ -265,6 +328,11 @@ class Socket extends FlowSocket{
   dynamic get endGroupDrained => this.streams.endGroupDrained;
   dynamic get beginGroupDrained => this.streams.beginGroupDrained;
   dynamic get mixedDrained => this.streams.streamDrained;
+
+  dynamic get dataInitd => this.streams.dataInitd;
+  dynamic get endGroupInitd => this.streams.endGroupInitd;
+  dynamic get beginGroupInitd => this.streams.beginGroupInitd;
+  dynamic get mixedInitd => this.streams.streamInitd;
 
   void enableFlushing(){
     this.streams.enableFlushing();  
@@ -437,7 +505,7 @@ class Port extends FlowPort{
   FlowSocket socket;
   dynamic aliasFilter;
   hub.Mutator _egtransformer,_bgtransformer,_dttransformer;
-  String id,componentID;
+  String id,componentID,_pc;
   
   static create(id,[cid]) => new Port(id,cid);
 
@@ -451,6 +519,12 @@ class Port extends FlowPort{
     this._bgtransformer = this.beginGroupStream.cloneTransformer();
     this._dttransformer = this.dataStream.cloneTransformer();
   }
+
+  void setClass(String pc){
+    this._pc = pc;
+  }
+
+  String get portClass => this._pc;
 
   bool get hasConnections => this.socket.hasConnections;
 
@@ -485,6 +559,11 @@ class Port extends FlowPort{
   dynamic get endGroupClosed => this.socket.endGroupClosed;
   dynamic get beginGroupClosed => this.socket.beginGroupClosed;
   dynamic get mixedClosed => this.socket.mixedClosed;
+
+  dynamic get dataInitd => this.socket.dataInitd;
+  dynamic get endGroupInitd => this.socket.endGroupInitd;
+  dynamic get beginGroupInitd => this.socket.beginGroupInitd;
+  dynamic get mixedInitd => this.socket.mixedInitd;
 
   bool boundedToPort(FlowPort a){
     return this.socket.boundedToPort(a);
@@ -780,6 +859,73 @@ class FutureCompiler{
 
 }
 
+class SparkFlowMessages{
+
+  static Map filterError(String id,String uuid,dynamic error,bool isDF){
+    return {
+      'type': 'filter',
+      'method': (!!isDF ? 'df' : 'bf'),
+      'id': id,
+      'uuid': uuid,
+      'error': error,
+      'message':'filter component error'
+    };
+  }
+
+  static Map IIPSocket(bool isAdd,String id,String uuid){
+    return {
+      'method': (isAdd ? 'add' : 'remove'),
+      'type': 'iipSocket',
+      'id':id,
+      'uuid': uuid,
+      'message':'adding intial information packet socket'
+    };
+  }
+
+  static Map IIP(bool isAdd,String id){
+    return {
+      'method': (isAdd ? 'add' : 'remove'),
+      'type': 'iip',
+      'id':id,
+      'message':'adding information packet'
+    };
+  }
+
+  static Map sendInital(uuid,data){
+    return {
+      'type':'iip',
+      'method': 'sendInitial',
+      'uuid': uuid,
+      'data': data,
+      'message':'sending intial information packets'
+    };
+  }
+
+  static Map component(String type,String id,String uuid){
+    return {
+      'id':id,
+      'uuid': uuid,
+      'type': type,
+      'message':'$type component to network'
+    };
+  }
+
+  static Map network(String type,String from,String to,[String top,String fop,String sid,dynamic error]){
+    return {
+      'type': type,
+      'from': from,
+      'to': to,
+      'fromPort': fop,
+      'toPort': top,
+      'socketid':sid,
+      'message': '$type operation on network',
+      'error': error
+    };
+  }
+
+
+}
+
 class Network extends FlowNetwork{
   //global futures of freze,boot,shutdown
   Completer _whenAlive,_whenFrozen,_whenDead;
@@ -897,7 +1043,7 @@ class Network extends FlowNetwork{
     return this.dfFilter.filter(id).then((_){
       return _;
     }).catchError((e){ 
-      this.errorStream.send({ 'type':"filterDF", 'alias': m, 'uuid': id, 'error': e});
+      this.errorStream.send(SparkFlowMessages.filterError(m,id,e,true));
     });
   }
 
@@ -907,7 +1053,7 @@ class Network extends FlowNetwork{
     return this.bfFilter.filter(id).then((_){
       return _;
     }).catchError((e){ 
-      this.errorStream.send({ 'type':"filterBF", 'alias': m, 'uuid': id, 'error': e});
+      this.errorStream.send(SparkFlowMessages.filterError(m,id,e,false));
     });
   }
 
@@ -928,7 +1074,7 @@ class Network extends FlowNetwork{
     if(n != null) n(iip);
 
     this.IIPSockets.add(iip);
-    this.infoStream.send({ 'message':'adding iip socket for $id','type':"addIIPSocket", 'alias':id,'for': component.UID });
+    this.infoStream.send(SparkFlowMessages.IIPSocket(true,id,component.uuid));
     return iip;
   }
 
@@ -939,7 +1085,7 @@ class Network extends FlowNetwork{
     var sock =  this.IIPSocketFilter.remove(id,IIPFilter);
     if(n != null) fn(sock);
     sock.selfDestruct();
-    this.infoStream.send({ 'type':"removeIIPSocket", 'alias':alias,'for': component.UID });
+    this.infoStream.send(SparkFlowMessages.IIPSocket(false,id,component.uuid));
     return sock;
   }
 
@@ -947,14 +1093,14 @@ class Network extends FlowNetwork{
     if(!this.uuidRegister.has(alias)) return null;
 
     if(this.isDead || this.isFrozen){
-        this.infoStream.send({ 'type':"addInitialPacket", 'alias':alias });
+        this.infoStream.send(SparkFlowMessages.IIP(true,alias));
         return this.IIPackets.add({ 'uuid': alias, 'data': data});
     };
 
     var socket = this.filterIIPSocket(alias);
     if(socket != null) socket.socket.send(data);
 
-    this.infoStream.send({ 'type':"addInitialPacket", 'alias':alias });
+    this.infoStream.send(SparkFlowMessages.IIP(true,alias));
     return socket;
   }
 
@@ -964,7 +1110,7 @@ class Network extends FlowNetwork{
     var data,uuid = this.uuidRegister.get(alias);
     data = this.iipDataIterator.remove(uuid,IIPDataFilter);
     if(n != null) n(data);
-    this.infoStream.send({ 'type':"removeInitialPacket", 'alias':alias });
+    this.infoStream.send(SparkFlowMessages.IIP(false,alias));
     return data;
   }
 
@@ -978,7 +1124,7 @@ class Network extends FlowNetwork{
       this.IIPackets.clear();
     });
  
-    this.infoStream.send({ 'type':"sendInitials", 'message': 'sending out all initials' });
+    this.infoStream.send({ 'type':"sendInitial", 'message': 'sending out all initials' });
   }
 
   dynamic add(FlowComponent a,String id,[Function n]){
@@ -987,7 +1133,7 @@ class Network extends FlowNetwork{
     this.components.bind(node,this.placeholder,1);
     this.uuidRegister.add(id,a.uuid);
     this.addIIPSocket(a,id,n);
-    this.infoStream.send({ 'type':"addComponent", 'message': 'adding new component','uuid': a.UID, 'alias':id });
+    this.infoStream.send(SparkFlowMessages.component('addComponent',id,a.uuid));
     return node;
   }
 
@@ -999,7 +1145,7 @@ class Network extends FlowNetwork{
       if(n != null) n(_);
       _.data.detach();
       this.components.eject(_);
-      this.infoStream.send({ 'type':"removeComponent", 'message': 'remove component','uuid': _.data.UID, 'alias':a });
+    this.infoStream.send(SparkFlowMessages.component('removeComponent',s,_.data.uuid));
     }).catchError((e){
       this.errorStream.send({'type':'network-remove', 'error': e, 'component': a });
     });
@@ -1017,10 +1163,10 @@ class Network extends FlowNetwork{
           var from = _[0], to = _[1];
           from.data.bind(aport,to.data,bport,sockid);
           this.components.bind(from,to,2);
-          this.infoStream.send({ 'type':"connectComponent", 'from': a, 'to': b,'message': 'connecting two component','uuid':'','alias':''});
+          this.infoStream.send(SparkFlowMessages.network('connect',a,b,bport,aport,sockid));
           return _;
         }).catchError((e){
-          this.errorStream.send({'type':'network-connect', 'error': e, 'from': a, 'to': b});
+          this.infoStream.send(SparkFlowMessages.network('connect',a,b,bport,aport,sockid,e));
       });
     }; 
 
@@ -1039,10 +1185,10 @@ class Network extends FlowNetwork{
         var from = _[0], to = _[1];
         from.data.unbind(aport,to.data,bport,sockid);
         this.components.unbind(from,to,2);
-        this.infoStream.send({ 'type':"disconnectComponent", 'from': a, 'to': b,'message': 'connecting two component','uuid':'','alias':''});
+        this.infoStream.send(SparkFlowMessages.network('disconnect',a,b,bport,aport,sockid));
         return _;
       }).catchError((e){
-        this.errorStream.send({'type':'network-disconnect', 'error': e, 'from': a, 'to': b});
+        this.infoStream.send(SparkFlowMessages.network('disconnect',a,b,bport,aport,sockid,e));
       });
     };
 
@@ -1065,7 +1211,9 @@ class Network extends FlowNetwork{
   Future freeze(){
     if(this.isFrozen && this._whenFrozen != null) return this.whenFrozen;
 
-    var completer = this._whenFrozen = (this._whenFrozen.isCompleted() ? new Completer() : this._whenFrozen);
+    // if(this.isAlive && this._whenAlive != null) this.whenAlive.then((){
+    // });
+    var completer = this._whenFrozen = new Completer();
     this.connectionsCompiler.whenComplete((_){
 
       if(this.isFrozen || this.isDead){
@@ -1187,14 +1335,15 @@ class Component extends FlowComponent{
   Component([String id]): super((id == null ? 'Component' : id)){
     this.network = Network.create(this.id+'-Subnet');
 
-    this.ports.add('option',Port.create('option',this.id));
-    this.ports.add('in',Port.create('in',this.id));
-    this.ports.add('err',Port.create('err',this.id));
-    this.ports.add('out',Port.create('out',this.id));
+    this.makePort('option','option');
+    this.makePort('in','in');
+    this.makePort('out','out');
+    this.makePort('err','err');
 
     this.alias.add('in','in');
     this.alias.add('out','out');
     this.alias.add('option','option');
+    this.alias.add('err','err');
 
     this.metas.add('uuid',this.uuid);
   }
@@ -1238,18 +1387,23 @@ class Component extends FlowComponent{
     return toPort.unbindPort(myPort);
   }
 
-  FlowPort makePort(String id,[Port p,bool override]){
+  FlowPort makePort(String id,String type,[Port p,bool override]){
+    if(!this.portClass.contains(type)) throw "Please provide a valid port class: in,out,err,option";
+
     if(this.alias.has(id) && (!override || override == null)) return null;
     var port = (p == null ? Port.create(id,this.id) : p);
-    if(override != null && !!override) this.ports.update(this.alias.get(id),port);
+    port.setClass(type);
+    if(override != null && !!override) 
+      this.ports.update(this.alias.get(id),port);
     else{
       this.alias.add(id,id);
       this.ports.add(this.alias.get(id),port);
     }
+
     return this.ports.get(this.alias.get(id));
   }
   
-  
+
   void close(){
     this.ports.onAll((n) => n.detach());
   }
@@ -1276,27 +1430,81 @@ class Component extends FlowComponent{
 
 }
 
-class SparkFlow extends FlowAbstract{
-  final metas = new hub.MapDecorator.from({'desc':'top level flowobject'});
-  final Network network;
-  var tree = new hub.MapDecorator();
+class MassTree extends hub.MapDecorator{
+  final canDestroy = hub.Switch.create();
 
-  static create(String id,[String desc]) => new SparkFlow(id,desc);
+  static create() => new MassTree();
 
-  SparkFlow(String id,[String desc]): network = Network.create(id){
-    this.metas.add('id',id);
-    if(desc != null) this.metas.add('desc',desc);
+  MassTree();
+
+  dynamic destroy(String key){
+    if(!this.canDestroy.on()) return null;
+    return super.destroy(key);
+  }
+
+  void addAll(Map n){
+    n.forEach((n,k){
+      this.add(n,k);
+    });
+  }
+}
+
+class ComponentLists{
+  var tree = MassTree.create();
+
+  static create() => new ComponentLists();
+
+  ComponentLists(){
+    this.enableRemove();
   }
 
   void add(String alias,Component a){
-    if(this.tree.has(alias)) throw "Alias $alias is already used";
+    if(this.tree.has(alias)) return null;
     this.tree.add(alias,a);
   }
 
   void remove(String alias){
-    if(!this.tree.has(alias)) return;
-    this.unUse(alias);
+    if(!this.tree.has(alias)) return null;
     this.tree.destroy(alias);
+  }
+
+  bool has(String alias){
+    return this.tree.has(alias);
+  }
+
+  void enableRemove(){
+    this.tree.canDestroy.switchOn();
+  }
+
+  void disableRemove(){
+    this.tree.canDestroy.switchOff();
+  }
+
+  void loadUp(ComponentLists n){
+    this.tree.addAll(n.tree.storage);
+  }
+}
+
+class SparkFlow extends FlowAbstract{
+  final metas = new hub.MapDecorator.from({'desc':'top level flowobject'});
+  ComponentLists tree = ComponentLists.create();
+  Network network; 
+
+  static create(String id,[String desc]) => new SparkFlow(id,desc);
+
+  SparkFlow(String id,[String desc]){
+    this.metas.add('id',id);
+    this.metas.add('desc',hub.Hub.switchUnless(desc,'basic sparkflow'));
+    this.network = Network.create(id);
+  }
+
+  void add(String alias,Component a){
+    this.tree.add(alias,a);
+  }
+
+  void remove(String alias){
+    this.unUse(alias);
+    this.tree.remove(alias);
   }
 
   void use(String alias,[Function n]){
@@ -1330,18 +1538,4 @@ class SparkFlow extends FlowAbstract{
 
 }
 
-class MassTree extends hub.MapDecorator{
-  final canDestroy = hub.Switch.create();
-
-  static create() => new MassTree();
-
-  MassTree();
-
-
-  dynamic destroy(String key){
-    if(!this.canDestroy.on()) return null;
-    return super.destroy(key);
-  }
-
-}
 

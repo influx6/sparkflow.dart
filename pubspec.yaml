@@ -4,8 +4,19 @@ author: Alexander Ewetumo<trinoxf@gmail.com>
 description: A flow-based approach to app development using a simple expressive approach
 homepage: http://github.com/influx6/sparkflow.dart
 dependencies:
+  browser: any
   ds: any
   hub: any
   invocable: any
   statemanager: any
   streamable: any
+  # ds:
+  #   path: ../ds
+  # hub:
+  #   path: ../hub
+  # invocable:
+  #   path: ../invocable
+  # statemanager:
+  #   path: ../statemanager
+  # streamable:
+  #   path: ../streamable
