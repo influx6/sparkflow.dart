@@ -4,7 +4,6 @@ import 'dart:async';
 import 'package:hub/hub.dart' as hub;
 import 'package:streamable/streamable.dart';
 import 'package:ds/ds.dart' as ds;
-import 'package:statemanager/statemanager.dart';
 
 
 /*base class for flow */
@@ -157,15 +156,15 @@ class SocketStream{
   final Streamable data = Streamable.create();  
   final Streamable end = Streamable.create();  
   final Streamable begin = Streamable.create();
-  StateManager state;
-  StateManager delimited;
+  hub.StateManager state;
+  hub.StateManager delimited;
   Streamable stream;
    
   static create() => new SocketStream();
   
   SocketStream(){
-    this.state = StateManager.create(this);
-    this.delimited = StateManager.create(this);
+    this.state = hub.StateManager.create(this);
+    this.delimited = hub.StateManager.create(this);
     
     this.delimited.add('yes', {
       'allowed': (r,c){ return true; }
@@ -184,7 +183,7 @@ class SocketStream{
     });
     
     this.begin.initd.on((n){
-      if(!this.state.ready()) this.data.resume();
+      if(!this.state.run('ready')) this.data.resume();
       this.state.switchState("lock");
       this.data.pause();
     });
@@ -195,9 +194,9 @@ class SocketStream{
     });
     
     this.stream = MixedStreams.combineUnOrder([begin,data,end])((tg,cg){
-      return this.state.ready();
+      return this.state.run('ready');
     },null,(cur,mix,streams,ij){   
-      if(this.delimited.allowed()) return mix.emit(cur.join(this.meta.get('delimiter')));
+      if(this.delimited.run('allowed')) return mix.emit(cur.join(this.meta.get('delimiter')));
       return mix.emitMass(cur);
     });
     
@@ -238,6 +237,16 @@ class SocketStream{
   dynamic get beginGroupClosed => this.begin.closed;
   dynamic get streamClosed => this.stream.closed;
 
+  dynamic get dataPaused => this.data.pauser;
+  dynamic get endGroupPaused => this.end.pauser;
+  dynamic get beginGroupPaused => this.begin.pauser;
+  dynamic get streamPaused => this.stream.pauser;
+
+  dynamic get dataResumed => this.data.resumer;
+  dynamic get endGroupResumed => this.end.resumer;
+  dynamic get beginGroupResumed => this.begin.resumer;
+  dynamic get streamResumed => this.stream.resumer;
+
   void whenDrained(Function n){
     this.stream.whenDrained(n);  
   }
@@ -273,16 +282,16 @@ class SocketStream{
 
 final socketFilter = (i,n){
   var socks = i.current;
-  if(socks.socket != null && socks.socket == n) return true;
+  if(socks.info.has('socket')) return true;
   return false;
 };
 
 final portFilter = (i,n){
   var socks = i.current;
-  if(socks.port != null && socks.port == n) return true;
+  if(socks.info.has('port')) return true;
   //if(socks.socket.port != null && socks.socket.port == n) return true;
-  if(socks.socket.from != null && socks.socket.from == n) return true;
-  if(socks.socket.to != null && socks.socket.to == n) return true;
+  if(socks.info.get('socket').from != null && socks.info.get('socket').from == n) return true;
+  if(socks.info.get('socket').to != null && socks.info.get('socket').to == n) return true;
   return false;
 };
 
@@ -333,6 +342,16 @@ class Socket extends FlowSocket{
   dynamic get endGroupInitd => this.streams.endGroupInitd;
   dynamic get beginGroupInitd => this.streams.beginGroupInitd;
   dynamic get mixedInitd => this.streams.streamInitd;
+
+  dynamic get dataPaused => this.streams.dataPaused;
+  dynamic get endGroupPaused => this.streams.endGroupPaused;
+  dynamic get beginGroupPaused => this.streams.beginGroupPaused;
+  dynamic get mixedPaused => this.streams.streamPaused;
+
+  dynamic get dataResumed => this.streams.dataResumed;
+  dynamic get endGroupResumed => this.streams.endGroupResumed;
+  dynamic get beginGroupResumed => this.streams.beginGroupResumed;
+  dynamic get mixedResumed => this.streams.streamResumed;
 
   void enableFlushing(){
     this.streams.enableFlushing();  
@@ -408,15 +427,15 @@ class Socket extends FlowSocket{
   dynamic attachPort(FlowPort a){
     var sub = this.bindSocket(a.socket);
     if(sub == null) return null;
-    sub.port = a;
+    sub.info.add('port',a);
     return sub;
   }
 
   dynamic detachPort(FlowPort a){
     var sock = this.filter.remove(a,null,portFilter).data;
     if(sock == null) return null;
-    if(sock.socket != null) sock.socket = null;
-    if(sock.port != null) sock.port = null;
+    if(sock.info.has('socket')) sock.info.destroy('socket');
+    if(sock.info.has('port')) sock.info.destroy('port');
     sock.close(true);
     return sock;
   }
@@ -432,7 +451,7 @@ class Socket extends FlowSocket{
   dynamic bindSocket(Socket a){
     if(this.filter.has(a,socketFilter)) return null;
     var sub = this.streams.stream.subscribe(a.send);
-    sub.socket = a;
+    sub.info.add('socket',a);
     this.subscribers.add(sub);
     return sub;
   }
@@ -440,8 +459,8 @@ class Socket extends FlowSocket{
   dynamic unbindSocket(Socket a){
     if(!this.filter.has(a,socketFilter)) return null;
     var sub = this.filter.remove(a,null,socketFilter).data;
-    if(sub.socket != null) sub.socket = null;
-    //if(sub.port != null) sub.port = null;
+    if(sub.info.has('socket')) sub.info.destroy('socket');
+    if(sub.info.has('port')) sub.info.destroy('port');
     sub.close(true);
     return sub;
   }
@@ -493,7 +512,7 @@ class Socket extends FlowSocket{
 
 //filters of socket subscribers with aliases
 final aliasFilterFn = (it,n){
-  if(it.current.alias == n) return true;
+  if(it.current.info.get('alias') == n) return true;
   return false;
 };
 
@@ -565,6 +584,16 @@ class Port extends FlowPort{
   dynamic get beginGroupInitd => this.socket.beginGroupInitd;
   dynamic get mixedInitd => this.socket.mixedInitd;
 
+  dynamic get dataPaused => this.socket.dataPaused;
+  dynamic get endGroupPaused => this.socket.endGroupPaused;
+  dynamic get beginGroupPaused => this.socket.beginGroupPaused;
+  dynamic get mixedPaused => this.socket.mixedPaused;
+
+  dynamic get dataResumed => this.socket.dataResumed;
+  dynamic get endGroupResumed => this.socket.endGroupResumed;
+  dynamic get beginGroupResumed => this.socket.beginGroupResumed;
+  dynamic get mixedResumed => this.socket.mixedResumed;
+
   bool boundedToPort(FlowPort a){
     return this.socket.boundedToPort(a);
   }
@@ -606,7 +635,7 @@ class Port extends FlowPort{
     if(sub == null) return null;
     this.counter.tick();
     var id = (alias == null ? this.counter.counter : alias).toString();
-    sub.alias = id;
+    sub.info.add('alias',id);
     this.aliases[id]= sub;
     return sub;
 
@@ -617,7 +646,7 @@ class Port extends FlowPort{
     var sub = this.socket.bindSocket(v);
     if(sub == null) return null;
     var id = (alias == null ? this.counter.tick() : alias).toString();
-    sub.alias = id;
+    sub.info.add('alias',id);
     this.aliases[id]= sub;
     return sub;
   }
@@ -626,10 +655,8 @@ class Port extends FlowPort{
     this.checkAliases();
     var sub = this.socket.detachPort(a);
     if(sub == null) return null;
-    this.removeSocketAlias(sub.alias);
-    sub.env.suppressErrors();
-    if(sub.alias != null) sub.alias = null;
-    sub.env.unsuppressErrors();
+    this.removeSocketAlias(sub.info.get('alias'));
+    if(sub.info.has('alias')) sub.info.destroy('alias');
     sub.closeAttributes();
     return sub;
   }
@@ -638,10 +665,8 @@ class Port extends FlowPort{
     this.checkAliases();
     var sub = this.socket.unbindSocket(v);
     if(sub == null) return null;
-    this.removeSocketAlias(sub.alias);
-    sub.env.suppressErrors();
-    if(sub.alias != null) sub.alias = null;
-    sub.env.unsuppressErrors();
+    this.removeSocketAlias(sub.info.get('alias'));
+    if(sub.info.has('alias')) sub.info.destroy('alias');
     sub.closeAttributes();
     return sub;
   }
@@ -699,10 +724,12 @@ class Port extends FlowPort{
       this._updatePortTransformerClones();
       var sub = this.getSocketAlias(alias);
       if(sub != null){
-        this._dttransformer.whenDone(sub.socket.send);
+        var socket = sub.info.get('socket');
+        if(socket == null) return null;
+        this._dttransformer.whenDone(socket.send);
         this._dttransformer.emit(data);
       }
-      return;
+      return null;
     }
     this.socket.send(data);
   }
@@ -982,7 +1009,7 @@ class Network extends FlowNetwork{
    this.iipDataIterator = this.IIPackets.iterator;
    this.placeholder = this.components.add(PlaceHolder.create('placeholder',hub.Hub.randomString(7)));
    this.uuidRegister.add('placeholder',this.placeholder.data.uuid);
-   this.stateManager = StateManager.create(this);
+   this.stateManager = hub.StateManager.create(this);
 
    this.stateManager.add('dead',{
       'frozen': (t,c){ return false; },
@@ -1300,15 +1327,15 @@ class Network extends FlowNetwork{
 
 
   bool get isAlive{
-    return this.stateManager.alive();
+    return this.stateManager.run('alive');
   }
 
   bool get isFrozen{
-    return this.stateManager.frozen();
+    return this.stateManager.run('frozen');
   }
 
   bool get isDead{
-    return this.stateManager.dead();
+    return this.stateManager.run('dead');
   }
 
   dynamic UUID(String id){

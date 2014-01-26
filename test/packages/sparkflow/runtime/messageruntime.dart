@@ -1,4 +1,4 @@
-library sparkflow.runtime;
+library sparkflow.runtimes;
 
 import 'dart:async';
 import 'dart:html';

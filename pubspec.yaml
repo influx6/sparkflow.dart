@@ -7,8 +7,6 @@ dependencies:
   browser: any
   ds: any
   hub: any
-  invocable: any
-  statemanager: any
   streamable: any
   # ds:
   #   path: ../ds

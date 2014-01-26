@@ -8,20 +8,12 @@ packages:
   ds:
     description: ds
     source: hosted
-    version: "0.0.4"
+    version: "0.3.0"
   hub:
     description: hub
     source: hosted
-    version: "0.2.0"
-  invocable:
-    description: invocable
-    source: hosted
-    version: "0.5.0"
-  statemanager:
-    description: statemanager
-    source: hosted
-    version: "0.0.1"
+    version: "0.5.2"
   streamable:
     description: streamable
     source: hosted
-    version: "0.0.6"
+    version: "0.1.0"

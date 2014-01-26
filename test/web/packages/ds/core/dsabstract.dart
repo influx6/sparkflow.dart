@@ -1,5 +1,34 @@
 part of ds.core;
 
+class Counter{
+  num _count = 0;
+  dynamic handler;
+  
+  Counter(this.handler);
+  
+  num get counter => _count;
+  
+  void tick(){
+    _count += 1;
+  }
+  
+  void untick(){
+    _count -= 1;
+  }
+  
+  void detonate(){
+    _count = 0;
+  }
+  
+  String toString(){
+    return "Counter: "+this.counter.toString();
+  }
+}
+  
+class Comparable{
+  bool compare(dynamic d);
+}
+
 class dsImpl {
 	
 	void addAll();
@@ -76,15 +105,26 @@ abstract class dsAbstractNode<T> implements Comparable{
 abstract class dsAbstractList<T> extends DS implements Comparable{
 	dsAbstractNode<T> head;
 	dsAbstractNode<T> tail;
+	int maxSize = null;
 	
-	num get size => bomb.counter; 
-	bool get isEmpty => (head == null && tail == null);
+	int get size => this.bomb.counter; 
+	bool get isEmpty => (this.head == null && this.tail == null);
 	
 	dsAbstractIterator get iterator;	
+	
+	void setMax(int m){
+	 this.maxSize  = m;  
+	}
+	
 	void nullify(){
     this.head = this.tail = null;
     this.bomb.detonate();
   }
+	
+	bool isDense(){
+	    if(this.maxSize == null) return false;
+	    return this.size >= this.maxSize;
+	}
 }
 
 abstract class dsTreeNode<T> extends dsAbstractNode<T>{

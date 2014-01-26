@@ -2,8 +2,6 @@
 
 import 'package:ds/ds.dart' as ds;
 import 'package:hub/hub.dart';
-import 'package:invocable/invocable.dart';
-import 'package:statemanager/statemanager.dart';
 
 abstract class Streamer<T>{
   void emit(T e);
@@ -24,9 +22,10 @@ abstract class Broadcast<T>{
   void add(T n) => this.propagate(n);
 }
 
-class Listener<T> extends ExtendableInvocable{
+class Listener<T>{
+  final info = Hub.createMapDecorator();
 
-  Listener(): super();
+  Listener();
 
   void emit(T a){}
   void pause(){}
@@ -133,19 +132,29 @@ class Streamable<T> extends Streamer<T>{
   final Distributor initd = Distributor.create('streamable-emitInitiation');
   final Distributor drained = Distributor.create('streamable-drainer');
   final Distributor closed = Distributor.create('streamable-close');
+  final Distributor resumer = Distributor.create('streamable-resume');
+  final Distributor pauser = Distributor.create('streamable-pause');
   final Distributor listeners = Distributor.create('streamable-listeners');
   dynamic iterator;
-  StateManager state,pushState;
-  int max;
+  StateManager state,pushState,flush;
   
   static create([n]) => new Streamable(n);
 
   Streamable([int m]){
-    this.max = m;
+    if(m != null) this.streams.setMax(m);
     this.state = StateManager.create(this);
     this.pushState = StateManager.create(this);
+    this.flush = StateManager.create(this);
     this.iterator = this.streams.iterator;
+  
+    this.flush.add('yes', {
+      'allowed': (t,c){ return true; }
+    });
 
+    this.flush.add('no', {
+      'allowed': (t,c){ return false; }
+    });
+    
     this.pushState.add('strict', {
       'strict': (target,control){ return true; },
       'delayed': (target,control){ return false; },
@@ -197,11 +206,13 @@ class Streamable<T> extends Streamer<T>{
     }); 
     
     this.transformer.whenDone((n){
+      
       this.streams.add(n);
       this.push();
     });
     
     this.state.switchState('resumed');
+    this.flush.switchState('no');
     this.pushState.switchState("strict");
     
   }
@@ -211,10 +222,21 @@ class Streamable<T> extends Streamer<T>{
     clone.updateTransformerListFrom(this.transformer);
     return clone;
   }
-
+  
+  void setMax(int m){
+    this.streams.setMax(m);  
+  }
+  
   void emit(T e){    
-    if(e == null) return;
-    if(this.isFull || this.streamClosed) return;
+    if(e == null) return null;
+    
+    if(this.streamClosed) return null;  
+    
+    if(this.isFull){
+      if(this.flush.run('allowed')) this.streams.clear();
+      else return null;
+    }
+    
     this.initd.emit(e);
     this.transformer.emit(e);
   }
@@ -299,12 +321,14 @@ class Streamable<T> extends Streamer<T>{
   
   void pause(){
     if(this.streamClosed) return;
-    this.state.switchState('paused');  
+    this.state.switchState('paused');
+    this.pauser.emit(this);
   }
   
   void resume(){
     if(this.streamClosed) return;
     this.state.switchState('resumed');
+    this.resumer.emit(this);
     this.push();
   }
  
@@ -351,12 +375,19 @@ class Streamable<T> extends Streamer<T>{
   }
   
   bool get isFull{
-    if(this.max == null) return false;
-    return this.streams.size >= this.max;
+    return this.streams.isDense();
+  }
+  
+  void enableFlushing(){
+    this.flush.switchState('yes');      
+  }
+  
+  void disableFlushing(){
+    this.flush.switchState('no');  
   }
   
   bool get pushDelayedEnabled{
-    return this.pushState.delayed();  
+    return this.pushState.run('delayed');  
   }
   
   bool get isEmpty{
@@ -364,23 +395,23 @@ class Streamable<T> extends Streamer<T>{
   }
   
   bool get streamClosed{
-    return this.state.closed();  
+    return this.state.run('closed');  
   }
 
   bool get streamClosing{
-    return this.state.closing();  
+    return this.state.run('closing');  
   }
   
   bool get streamPaused{
-    return this.state.paused();
+    return this.state.run('paused');
   }
   
   bool get streamResumed{
-    return this.state.resumed();
+    return this.state.run('resumed');
   }  
 
   bool get streamFiring{
-    return this.state.firing();
+    return this.state.run('firing');
   }
   
   bool get hasListeners{
@@ -410,6 +441,18 @@ class Subscriber<T> extends Listener<T>{
 
   Mutator get transformer => this.stream.transformer;
 
+  void setMax(int m){
+    this.stream.setMax(m);  
+  }
+
+  void enableFlushing(){
+    this.stream.enableFlushing(); 
+  }
+  
+  void disableFlushing(){
+    this.stream.disableFlushing();
+  }
+  
   void whenDrained(Function n){
     this.stream.whenDrained(n);
   }
@@ -452,7 +495,7 @@ class Subscriber<T> extends Listener<T>{
   }
   
   void closeAttributes(){
-    super.close();  
+    //does nothing - removed dynamic properties of invocable for dart2js compatibility
   }
   
   void close([bool n]){

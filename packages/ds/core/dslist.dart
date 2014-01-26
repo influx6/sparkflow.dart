@@ -1,7 +1,6 @@
 part of ds.core;
 
 class dsList<T> extends dsAbstractList{
-	num maxSize;
 	dsListIterator _it;
 	
   static create([n]){
@@ -20,7 +19,7 @@ class dsList<T> extends dsAbstractList{
   }
 
   dsList(){
-	this._it = dsListIterator.create(this);
+	 this._it = dsListIterator.create(this);
   }
 	
   dsNode add(T d) => this.append(d);
@@ -30,7 +29,7 @@ class dsList<T> extends dsAbstractList{
 	      this.head = this.tail = dsNode.create(d); 
 	      this.incCounter();
 	      return this.tail;
-	    }
+	  }
 		var tail = this.tail;
 		var left = tail.left;
 		var right = tail.right;
@@ -132,15 +131,14 @@ class dsList<T> extends dsAbstractList{
 	  this.head = this.tail = null;
 	}
 
-	bool isDense(){
-		if(this.size < this.maxSize) return false;
-	}
+
 	
 	void free(){ 
     if(this.isEmpty) return;
 		this.head.freeCascade();	
 		this.head.unmarkCascade();
     this.head = this.tail = null;
+    this.bomb.detonate();
 	}
 
 	void clear(){
@@ -159,11 +157,11 @@ class dsList<T> extends dsAbstractList{
 	String toString(){
 	    var buffer = new StringBuffer(),
 	    it = this.iterator;
+	    buffer.write("List::Contents:");
 	    while(it.moveNext()) buffer.write(it.current);
 	    return buffer.toString();
 	}
 
-	bool  get isEmpty => (this.head == null && this.tail == null);
 	dsNode get root => this.head;
 	dsListIterator get iterator => dsListIterator.create(this);
 }

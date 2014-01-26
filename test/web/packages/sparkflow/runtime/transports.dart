@@ -1,4 +1,4 @@
-library sparkflow.runtime;
+library sparkflow.transport;
 
 import 'dart:async';
 import 'package:hub/hub.dart' as hub;

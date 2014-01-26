@@ -4,6 +4,109 @@ import 'dart:mirrors';
 import 'dart:math' as math;
 import 'dart:async';
 
+Function _empty(t,s){}
+
+//StateObject with map get and setters
+class State{
+  final MapDecorator states = new MapDecorator();
+  dynamic target;
+  String name;
+  bool _active = false;
+ 
+  static create(t,s,[n]) => new State(t,s,n);
+  
+  State(this.target,Map sets,[String name]){
+    this.name = Hub.switchUnless(name, 'StateObject');
+    //if init and dinit do not exist,provide empty shell,just in case we wish to do some work
+    if(this.states.get('init') == null) this.states.add('init', _empty);
+    if(this.states.get('dinit') == null) this.states.add('dinit',_empty);
+    
+    sets.forEach((n,k){
+      this.add(n,(){
+        if(this.deactivated) return null;
+        var m = k(this.target,this);
+        return m;
+      }); 
+    });
+  }
+  
+  void add(String key,Function n){
+    this.states.add(key,n);
+  }
+
+  void activate(){
+    this.states.get('init')(this.target,this);
+    this._active = true;
+  }
+  
+  void deactivate(){
+    this.states.get('dinit')(this.target,this);
+    this._active = false;
+  }
+  
+  Function get(String n){
+    return this.states.get(n);
+  }
+  
+  dynamic run(String n){
+    if(!this.states.has(n)) return null;
+    return this.get(n)();
+  }
+  
+  Function destroy(String n){
+    return this.states.destroy(n);
+  }
+
+  bool get activated => !!this._active;
+  bool get deactivated => !this._active;
+  
+}
+
+//using function calls and not dynamic invocation
+class StateManager{
+    Object target;
+    dynamic store,current;
+    
+    static create(t) => new StateManager(t);
+    
+    StateManager(this.target){
+      this.store = Hub.createMapDecorator();
+    }
+    
+    void add(String name,dynamic m){
+      if(m is State) return this._addState(name, m);
+      return this._createState(name, m);
+    }
+    
+    void _createState(String name,Map<String,Function> states){
+      this.store.add(name,new State(this.target,states,name));
+    }
+    
+    void _addState(String name,State state){
+      this.store.add(name,state);  
+    }
+    
+    void removeState(String name){
+      this.store.destroy(name);
+    }
+
+    dynamic run(String name){
+      if(!this.isReady) return null;
+      return this.current.run(name);
+    }
+    
+    void switchState(String name){
+      if(!this.store.has(name)) return;
+      if(this.current != null) this.current.deactivate();
+      this.current = this.store.get(name);
+      this.current.activate();
+      return;
+    }
+    
+    bool get isReady => this.current != null;
+    
+}
+
 
 abstract class Comparable{
   bool compare(dynamic d);
@@ -512,14 +615,14 @@ class SingleLibraryManager{
 }
 
 class Counter{
-  num _count = 0;
+  int _count = 0;
   dynamic handler;
   
   static create(n) => new Counter(n);
 
   Counter(this.handler);
   
-  num get counter => _count;
+  int get counter => _count;
   
   void tick(){
     _count += 1;
@@ -841,6 +944,11 @@ class Hub{
 		return Future.wait(res);
 	}
 		
+  static dynamic switchUnless(m,n){
+    if(m == null) return n;
+    return m;
+  }
+
 	static final symbolMatch = new RegExp(r'\(|Symbol|\)');
 	
 	static dynamic throwNoSuchMethodError(Invocation n,Object c){
