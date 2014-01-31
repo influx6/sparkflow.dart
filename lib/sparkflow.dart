@@ -35,14 +35,12 @@ abstract class MessageRuntime{
   Streamable errMessages,outMessages,inMessages;
   dynamic root;
 
-  //static create(m,[tf]) => new PostMessageRuntime(m,tf);
-
   MessageRuntime(this.root,[bool catchExceptions]){
     this.options.add('catchExceptions',(catchExceptions == null ? false : catchExceptions));
 
     this.outMessages = Streamable.create();
     this.inMessages = Streamable.create();
-    this.errMessages = sm.Streamable.create();
+    this.errMessages = Streamable.create();
 
     this.init();
   }
@@ -67,6 +65,7 @@ abstract class MessageRuntime{
       'command': command,
       'payload': payload,
     };
+
     this.outMessages.emit({'target': target, 'message': data, 'ports': ports });
   }
 

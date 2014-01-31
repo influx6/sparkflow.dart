@@ -9,10 +9,18 @@ packages:
     description: ds
     source: hosted
     version: "0.3.0"
+  guardedfs:
+    description: guardedfs
+    source: hosted
+    version: "0.0.7"
   hub:
     description: hub
     source: hosted
     version: "0.5.2"
+  path:
+    description: path
+    source: hosted
+    version: "1.0.0"
   streamable:
     description: streamable
     source: hosted

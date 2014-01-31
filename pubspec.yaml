@@ -8,7 +8,7 @@ dependencies:
   ds: any
   hub: any
   streamable: any
-  guardedfs:any
+  guardedfs: any
   # ds:
   #   path: ../ds
   # hub:
