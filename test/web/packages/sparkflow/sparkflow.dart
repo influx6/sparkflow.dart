@@ -5,6 +5,204 @@ import 'package:hub/hub.dart' as hub;
 import 'package:streamable/streamable.dart';
 import 'package:ds/ds.dart' as ds;
 
+abstract class BaseTransport{
+  hub.MapDecorator options;
+  dynamic context;
+
+  BaseTransport(Map ops){
+    this.options = new hub.MapDecorator.from(ops);
+    this.context = null;
+  }
+
+  void send(protocol,topic,payload,context);
+
+  void receive(protocol,topic,payload,context);
+}
+
+abstract class BaseProtocol{
+  BaseTransport transport;
+
+  BaseProtocol(this.transport);
+
+  void send(topic,payload,context);
+
+  void receive(topic,payload,context);
+}
+
+class ComponentProtocol extends BaseProtocol{
+  ComponentLists componentList;
+
+  static create(t,l) => new ComponentProtocol(t,l);
+
+  ComponentProtocol(t,l): super(t){
+    this.componentList = l;
+  }
+
+  void send(topic,payload,[context]){
+    this.transport.send('component',topic,payload,context);
+  }
+
+  void listComponent(context){
+    this.componentList.onAll((k,v){
+      this.sendComponent(k,v,context);
+    });
+  }
+
+  void sendComponent(String component,FlowComponent instance,context){
+    var portclass = instance.getPortClassList();
+    var load = {
+      'name': component,
+      'description': instance.metas.get('desc'),
+      //'uuid': instance.metas.get('uuid'),
+      'inports': portclass['in'],
+      'outports': portclass['out'],
+      'errports': portclass['err'],
+      'optionports': portclass['option'],
+      'icon': 'blank'
+    };
+
+    this.send('component',load,context);
+  }
+
+  void registerNetwork(id,graph,context){
+
+  }
+
+  void receive(topic,payload,context){
+    if(topic == 'list') this.listComponent(context);
+  }
+  
+}
+
+class NetworkProtocol extends BaseProtocol{
+  Network net;
+
+  static create(t,n) => new NetworkProtocol(t,n);
+  
+  NetworkProtocol(t,n): super(t){
+    this.net = n;
+  }
+
+  void send(topic,payload,context){
+    this.transport.send('network',topic,payload,context);
+  }
+  
+  void startNetwork(payload,context){
+    this.net.boot();
+  }
+
+  void pauseNetwork(payload,context){
+    this.net.boot();
+  }
+
+  void stopNetwork(payload,context){
+    this.net.boot();
+  }
+
+  void addEdge(payload,context){
+
+  }
+
+  void removeEdge(payload,context){
+
+  }
+
+  void addNode(payload,context){
+
+  }
+
+  void removeNode(payload,context){
+
+  }
+
+  void renameNode(payload,context){
+
+  }
+
+  void addInitial(payload,context){
+
+  }
+
+  void removeInitial(payload,context){
+
+  }
+
+  void receive(topic,payload,context){
+    if(topic == 'start') this.startNetwork(payload,context);
+    if(topic == 'stop') this.stopNetwork(payload,context);
+    if(topic == 'pause') this.pauseNetwork(payload,context);
+    if(topic == 'addEdge') this.addEdge(payload,context);
+    if(topic == 'removeEdge') this.removeEdge(payload,context);
+    if(topic == 'addNode') this.addNode(payload,context);
+    if(topic == 'removeNode') this.removeNode(payload,context);
+    if(topic == 'renameNode') this.renameNode(payload,context);
+    if(topic == 'addInitial') this.addInitial(payload,context);
+    if(topic == 'removeInitial') this.removeInitial(payload,context);
+  }
+}
+
+
+abstract class SparkFlowTransport extends BaseTransport{
+  SparkFlow flow;
+  ComponentProtocol com;
+  NetworkProtocol net;
+
+  SparkFlowTransport(this.flow,[Map ops]): super(hub.Hub.switchUnless(ops,{})){
+    this.com = ComponentProtocol.create(this.flow,this.flow.tree);
+    this.net = NetworkProtocol.create(this.flow,this.flow.network);
+  }
+
+  void send(protocol,topic,payload,context);
+
+  void receive(protocol,topic,payload,context){
+    if(protocol == 'graph') return this.net.receive(topic,payload,context);
+    if(protocol == 'network') return this.net.receive(topic,payload,context);
+    if(protocol == 'component') return this.com.receive(topic,payload,context);
+  }
+}
+
+abstract class MessageRuntime{
+  final options = hub.Hub.createMapDecorator();
+  Streamable errMessages,outMessages,inMessages;
+  dynamic root;
+
+  MessageRuntime(this.root,[bool catchExceptions]){
+    this.options.add('catchExceptions',(catchExceptions == null ? false : catchExceptions));
+
+    this.outMessages = Streamable.create();
+    this.inMessages = Streamable.create();
+    this.errMessages = Streamable.create();
+  }
+
+  void init(){
+    this.bindOutStream();
+    this.bindInStream();
+    if(!!this.options.get('catchExceptions')) this.bindErrorStream();
+  }
+
+  void send(protocol,command,payload,target,[List ports]){
+    if(payload is Exception){
+      var message = payload.toString();
+      payload = { 'message': message };
+    }
+
+    if(target is Map && !target.containsKey('href')) target['href'] = '*';
+    if(target is String) target = { 'href': target };
+
+    var data = {
+      'protocol': protocol,
+      'command': command,
+      'payload': payload,
+    };
+
+    this.outMessages.emit({'target': target, 'message': data, 'ports': ports });
+  }
+
+  void bindInStream();
+  void bindErrorStream();
+  void bindOutStream();
+
+}
 
 /*base class for flow */
 abstract class FlowAbstract{
@@ -30,50 +228,7 @@ abstract class FlowPort{
 
 }
 
-abstract class MessageRuntime{
-  final options = hub.Hub.createMapDecorator();
-  Streamable errMessages,outMessages,inMessages;
-  dynamic root;
 
-  MessageRuntime(this.root,[bool catchExceptions]){
-    this.options.add('catchExceptions',(catchExceptions == null ? false : catchExceptions));
-
-    this.outMessages = Streamable.create();
-    this.inMessages = Streamable.create();
-    this.errMessages = Streamable.create();
-
-    this.init();
-  }
-
-  void init(){
-    this.bindOutStream();
-    this.bindInStream();
-    if(!!this.options.get('catchExceptions')) this.bindErrorStream();
-  }
-
-  void send(protocol,command,payload,target,[List ports]){
-    if(payload is Exception){
-      var message = payload.toString();
-      payload = { 'message': message };
-    }
-
-    if(target is Map && !target.containsKey('href')) target['href'] = '*';
-    if(target is String) target = { href: target };
-
-    var data = {
-      'protocol': protocol,
-      'command': command,
-      'payload': payload,
-    };
-
-    this.outMessages.emit({'target': target, 'message': data, 'ports': ports });
-  }
-
-  void bindInStream();
-  void bindErrorStream();
-  void bindOutStream();
-
-}
 
 abstract class FlowComponent{
   final List portClass = ['in','out','err','option'];
@@ -298,7 +453,7 @@ class Socket extends FlowSocket{
   final Distributor continued = Distributor.create('streamable-streamcontinue');
   final Distributor halted = Distributor.create('streamable-streamhalt');
   final String uuid = hub.Hub.randomString(5);
-  final ds.dsList subscribers = ds.dsList.create();
+  final subscribers = ds.dsList.create();
   SocketStream streams;
   FlowPort from,to;
   var filter;
@@ -1508,6 +1663,10 @@ class ComponentLists{
 
   void loadUp(ComponentLists n){
     this.tree.addAll(n.tree.storage);
+  }
+  
+  void onAll(Function n){
+    this.tree.onAll(n);
   }
 }
 

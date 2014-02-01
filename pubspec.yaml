@@ -1,21 +1,11 @@
 name: sparkflow
-version: 0.0.8
 author: Alexander Ewetumo<trinoxf@gmail.com>
-description: A flow-based approach to app development using a simple expressive approach
+version: 0.1.0
 homepage: http://github.com/influx6/sparkflow.dart
+description: A flow-based approach to app development using a simple expressive approach
 dependencies:
   browser: any
   ds: any
+  guardedfs: any
   hub: any
   streamable: any
-  guardedfs: any
-  # ds:
-  #   path: ../ds
-  # hub:
-  #   path: ../hub
-  # invocable:
-  #   path: ../invocable
-  # statemanager:
-  #   path: ../statemanager
-  # streamable:
-  #   path: ../streamable
