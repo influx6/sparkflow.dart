@@ -1195,22 +1195,31 @@ class Network extends FlowNetwork{
   void lockNetworkStreams(){
     this.nout.disconnect();
     this.nin.disconnect();
-    this.errorStream.disconnect();
-    this.infoStream.disconnect();
+    this.errorStream.pause();
+    this.connectionStream.pause();
+    this.componentStream.pause();
+    this.networkStream.pause();
+    this.iipStream.pause();
   }
 
   void unlockNetworkStreams(){
     this.nout.connect();
     this.nin.connect();
-    this.errorStream.connect();
-    this.infoStream.connect();
+    this.errorStream.resume();
+    this.connectionStream.resume();
+    this.componentStream.resume();
+    this.networkStream.resume();
+    this.iipStream.resume();
   }
 
   void closeNetworkStreams(){
     this.nout.close();
     this.nin.close();
     this.errorStream.close();
-    this.infoStream.close();
+    this.connectionStream.close();
+    this.componentStream.close();
+    this.networkStream.close();
+    this.iipStream.close();
   }
 
   Future get whenAlive => this._whenAlive.future;
@@ -1229,7 +1238,7 @@ class Network extends FlowNetwork{
     return this.dfFilter.filter(id).then((_){
       return _;
     }).catchError((e){ 
-      this.errorStream.send(SparkFlowMessages.filterError(m,id,e,true));
+      this.networkStream.emit(SparkFlowMessages.filterError(m,id,e,true));
     });
   }
 
@@ -1239,7 +1248,7 @@ class Network extends FlowNetwork{
     return this.bfFilter.filter(id).then((_){
       return _;
     }).catchError((e){ 
-      this.errorStream.send(SparkFlowMessages.filterError(m,id,e,false));
+      this.networkStream.emit(SparkFlowMessages.filterError(m,id,e,false));
     });
   }
 
@@ -1524,6 +1533,8 @@ class Network extends FlowNetwork{
 
 /*class for component*/
 class Component extends FlowComponent{
+  final connectionStream = Streamable.create();
+  final stateStream = Streamable.create();
   var network;
 
   
@@ -1575,6 +1586,7 @@ class Component extends FlowComponent{
     this.ports.onAll((k,n){
        n.connect();
     });
+    this.stateStream.emit({'type':'component-boot','id': this.id,'uuid':this.metas.get('uuid')});
     return this.network.boot();
   }
 
@@ -1582,6 +1594,7 @@ class Component extends FlowComponent{
     this.ports.onAll((k,n){
        n.disconnect();
     });   
+    this.stateStream.emit({'type':'component-freeze','id': this.id,'uuid':this.metas.get('uuid')});
     return this.network.freeze();
   }
 
@@ -1589,6 +1602,7 @@ class Component extends FlowComponent{
     this.ports.onAll((k,n){
        n.close();
     });
+    this.stateStream.emit({'type':'component-shutdown','id': this.id,'uuid':this.metas.get('uuid')});
     return this.network.shutdown();
   }
 
@@ -1598,6 +1612,7 @@ class Component extends FlowComponent{
     var myPort = this.port(myport),
           toPort = component.port(toport);
 
+    this.connectionStream.emit(SparkFlowMessages.network('component-bind',component.id,this.id,toport,myport,mysocketId));
     return toPort.bindPort(myPort,mysocketId);
   }
 
@@ -1607,6 +1622,7 @@ class Component extends FlowComponent{
     var myPort = this.port(myport),
           toPort = component.port(toport);
 
+    this.connectionStream.emit(SparkFlowMessages.network('component-unbind',component.id,this.id,toport,myport,mysocketId));
     return toPort.unbindPort(myPort);
   }
 
