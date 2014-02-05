@@ -104,7 +104,7 @@ void main(){
       network.nin.send('frozen!');
       network.boot();
       
-      network.infoStream.tap((m){
+      network.networkStream.on((m){
         print('update: \n $m \n');
       });
     });
@@ -112,4 +112,20 @@ void main(){
 
   });
 
+//  this fires first and the other of data changes
+//  network.freeze();
+//  
+//  
+//  network.addInitial('prefixer','pre::');
+//  
+//  network.whenFrozen.then((_){
+//    print('isFrozen!');
+//    network.nin.send('frozen!');
+//    network.boot();
+//    
+//    network.infoStream.tap((m){
+//      print('update: \n $m \n');
+//    });
+//  });
+  
 }

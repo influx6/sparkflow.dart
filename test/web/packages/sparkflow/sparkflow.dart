@@ -7,16 +7,14 @@ import 'package:ds/ds.dart' as ds;
 
 abstract class BaseTransport{
   hub.MapDecorator options;
-  dynamic context;
 
   BaseTransport(Map ops){
     this.options = new hub.MapDecorator.from(ops);
-    this.context = null;
   }
 
-  void send(protocol,topic,payload,context);
+  void send(protocol,topic,payload);
 
-  void receive(protocol,topic,payload,context);
+  void receive(protocol,topic,payload);
 }
 
 abstract class BaseProtocol{
@@ -24,9 +22,9 @@ abstract class BaseProtocol{
 
   BaseProtocol(this.transport);
 
-  void send(topic,payload,context);
+  void send(topic,payload);
 
-  void receive(topic,payload,context);
+  void receive(topic,payload);
 }
 
 class ComponentProtocol extends BaseProtocol{
@@ -38,22 +36,22 @@ class ComponentProtocol extends BaseProtocol{
     this.componentList = l;
   }
 
-  void send(topic,payload,[context]){
-    this.transport.send('component',topic,payload,context);
+  void send(topic,payload){
+    this.transport.send('component',topic,payload);
   }
 
-  void listComponent(context){
+  void listComponent(){
     this.componentList.onAll((k,v){
-      this.sendComponent(k,v,context);
+      this.sendComponent(k,v);
     });
   }
 
-  void sendComponent(String component,FlowComponent instance,context){
+  void sendComponent(String component,FlowComponent instance){
     var portclass = instance.getPortClassList();
     var load = {
       'name': component,
       'description': instance.metas.get('desc'),
-      //'uuid': instance.metas.get('uuid'),
+      'uuid': instance.metas.get('uuid'),
       'inports': portclass['in'],
       'outports': portclass['out'],
       'errports': portclass['err'],
@@ -61,105 +59,59 @@ class ComponentProtocol extends BaseProtocol{
       'icon': 'blank'
     };
 
-    this.send('component',load,context);
+    this.send('component',load);
   }
 
-  void registerNetwork(id,graph,context){
 
-  }
-
-  void receive(topic,payload,context){
-    if(topic == 'list') this.listComponent(context);
+  void receive(topic,payload){
+    if(topic == 'list') this.listComponent();
   }
   
 }
 
-class NetworkProtocol extends BaseProtocol{
+abstract class NetworkProtocol extends BaseProtocol{
   Network net;
-
-  static create(t,n) => new NetworkProtocol(t,n);
   
   NetworkProtocol(t,n): super(t){
     this.net = n;
   }
 
-  void send(topic,payload,context){
-    this.transport.send('network',topic,payload,context);
-  }
+  void send(topic,payload);
   
-  void startNetwork(payload,context){
-    this.net.boot();
-  }
+  void startNetwork(payload);
 
-  void pauseNetwork(payload,context){
-    this.net.boot();
-  }
+  void freezeNetwork(payload);
 
-  void stopNetwork(payload,context){
-    this.net.boot();
-  }
+  void shutdownNetwork(payload);
 
-  void addEdge(payload,context){
+  void connect(payload);
 
-  }
+  void disconnect(payload);
 
-  void removeEdge(payload,context){
+  void addComponent(payload);
 
-  }
+  void removeComponent(payload);
 
-  void addNode(payload,context){
+  void renameComponent(payload);
 
-  }
+  void addComponentInitial(payload);
 
-  void removeNode(payload,context){
+  void removeComponentInitial(payload);
 
-  }
-
-  void renameNode(payload,context){
-
-  }
-
-  void addInitial(payload,context){
-
-  }
-
-  void removeInitial(payload,context){
-
-  }
-
-  void receive(topic,payload,context){
-    if(topic == 'start') this.startNetwork(payload,context);
-    if(topic == 'stop') this.stopNetwork(payload,context);
-    if(topic == 'pause') this.pauseNetwork(payload,context);
-    if(topic == 'addEdge') this.addEdge(payload,context);
-    if(topic == 'removeEdge') this.removeEdge(payload,context);
-    if(topic == 'addNode') this.addNode(payload,context);
-    if(topic == 'removeNode') this.removeNode(payload,context);
-    if(topic == 'renameNode') this.renameNode(payload,context);
-    if(topic == 'addInitial') this.addInitial(payload,context);
-    if(topic == 'removeInitial') this.removeInitial(payload,context);
+  void receive(command,payload){
+    if(command == 'startNetwork') this.startNetwork(payload);
+    if(command == 'shutdownNetwork') this.shutdownNetwork(payload);
+    if(command == 'freezeNetwork') this.freezeNetwork(payload);
+    if(command == 'connect') this.connect(payload);
+    if(command == 'disconnect') this.disconnect(payload);
+    if(command == 'addComponent') this.addComponent(payload);
+    if(command == 'removeComponent') this.removeComponent(payload);
+    if(command == 'renameComponent') this.renameComponent(payload);
+    if(command == 'addComponentInitial') this.addComponentInitial(payload);
+    if(command == 'removeComponentInitial') this.removeComponentInitial(payload);
   }
 }
 
-
-abstract class SparkFlowTransport extends BaseTransport{
-  SparkFlow flow;
-  ComponentProtocol com;
-  NetworkProtocol net;
-
-  SparkFlowTransport(this.flow,[Map ops]): super(hub.Hub.switchUnless(ops,{})){
-    this.com = ComponentProtocol.create(this.flow,this.flow.tree);
-    this.net = NetworkProtocol.create(this.flow,this.flow.network);
-  }
-
-  void send(protocol,topic,payload,context);
-
-  void receive(protocol,topic,payload,context){
-    if(protocol == 'graph') return this.net.receive(topic,payload,context);
-    if(protocol == 'network') return this.net.receive(topic,payload,context);
-    if(protocol == 'component') return this.com.receive(topic,payload,context);
-  }
-}
 
 abstract class MessageRuntime{
   final options = hub.Hub.createMapDecorator();
@@ -180,14 +132,7 @@ abstract class MessageRuntime{
     if(!!this.options.get('catchExceptions')) this.bindErrorStream();
   }
 
-  void send(protocol,command,payload,target,[List ports]){
-    if(payload is Exception){
-      var message = payload.toString();
-      payload = { 'message': message };
-    }
-
-    if(target is Map && !target.containsKey('href')) target['href'] = '*';
-    if(target is String) target = { 'href': target };
+  void send(protocol,command,payload,target){
 
     var data = {
       'protocol': protocol,
@@ -195,7 +140,7 @@ abstract class MessageRuntime{
       'payload': payload,
     };
 
-    this.outMessages.emit({'target': target, 'message': data, 'ports': ports });
+    this.outMessages.emit({'target': target, 'message': data });
   }
 
   void bindInStream();
@@ -225,19 +170,20 @@ abstract class FlowPort{
   void beginGroup(data);
   void endGroup(data);
   void disconnect();
-
+  void setClass(String m);
 }
 
-
-
 abstract class FlowComponent{
+  final String uuid = hub.Hub.randomString(7);
   final List portClass = ['in','out','err','option'];
   final alias = new hub.MapDecorator();
   final metas = new hub.MapDecorator.from({'desc':'basic description'});
   final ports = new hub.MapDecorator();
+  // final bindMeta = new hub.MapDecorator();
 
   FlowComponent(id){
     this.metas.add('id',id);
+    this.metas.add('uuid',this.uuid);
   }
 
   bool hasPort(String id){
@@ -251,6 +197,57 @@ abstract class FlowComponent{
   void renamePort(oldName,newName){
     this.alias.updateKey(oldName,newName);
   }
+
+  /*
+    {
+       alex:{
+          'in':['out','in'],
+          'err': 'out',
+       }
+    }
+  */
+  // void updateBind(String component,String port,String myport){
+  //   if(!this.bindMeta.get(myport)) this.bindMeta.add(myport,{});
+  //   var port = this.bindMeta.get(myport);
+  //   var component = port.containsKey(component) ? port[component] : (port[component] = {});
+  //   var cport = component.containsKey(port) ? component[port] : (component[port] = []);
+  //   if(!cport.contains(myport)) cport.add(myport);
+  // }
+
+  // void updateUnBind(String component,String port,String myport){
+  //   if(!this.bindMeta.get(myport)) this.bindMeta.add(myport,{});
+  //   var port = this.bindMeta.get(myport);
+  //   var component = port.containsKey(component) ? port[component] : (port[component] = {});
+  //   var cport = component.containsKey(port) ? component[port] : (component[port] = []);
+  //   var ind = cport.indexOf(myport);
+  //   if(ind == -1) return null;
+
+
+
+  // }
+
+  Map get toMeta{
+    var payload = {};
+
+    payload['uuid'] = this.metas.get('uuid');
+    payload['ports']= {};
+    payload['id']= this.id;
+    payload['uid'] = this.UID;
+    payload['portClass'] = new List.from(this.portClass);
+    
+    this.alias.onAll((n,k){
+        var port = this.port(n);
+        payload['ports'][k] = {
+          'alias': n,
+          'type':  port.portClass,
+          'id': k
+        };
+    });
+    
+    return payload;
+  }
+
+  String get UID => this.metas.get('id')+'#'+this.metas.get('uuid');
 
   dynamic meta(id,[val]){
     if(val != null && !this.metas.has(id)) this.metas.add(id,val);
@@ -1109,7 +1106,7 @@ class SparkFlowMessages{
 
 class Network extends FlowNetwork{
   //global futures of freze,boot,shutdown
-  Completer _whenAlive,_whenFrozen,_whenDead;
+  Completer _whenAlive = new Completer(),_whenFrozen = new Completer(),_whenDead = new Completer();
   //timestamps
   var startStamp,stopStamp;
   // iterator for the graph and iips
@@ -1129,9 +1126,17 @@ class Network extends FlowNetwork{
   //final inport for the particular network,optionally usable
   final Port nin = Port.create('networkInport');
   // the error stream
-  final errorStream = Port.create('networkError');
-  // the info stream
-  final infoStream = Port.create('networkInfo');
+  final Port nerr = Port.create('networkError');
+  // the network error stream
+  final errorStream = Streamable.create();
+  final iipStream = Streamable.create();
+  final componentStream = Streamable.create();
+  final networkStream = Streamable.create();
+  final connectionStream = Streamable.create();
+  // the network state distributors
+  final onAlive = Distributor.create('onAlive-distributor');
+  final onDead = Distributor.create('onDead-distributor');
+  final onFrozen = Distributor.create('onFrozen-distributor');
   // graph of loaded components
   final components = new ds.dsGraph<FlowComponent,int>();
   // list of Initial Information Packets
@@ -1255,7 +1260,7 @@ class Network extends FlowNetwork{
     if(n != null) n(iip);
 
     this.IIPSockets.add(iip);
-    this.infoStream.send(SparkFlowMessages.IIPSocket(true,id,component.uuid));
+    this.iipStream.emit(SparkFlowMessages.IIPSocket(true,id,component.uuid));
     return iip;
   }
 
@@ -1266,7 +1271,7 @@ class Network extends FlowNetwork{
     var sock =  this.IIPSocketFilter.remove(id,IIPFilter);
     if(n != null) fn(sock);
     sock.selfDestruct();
-    this.infoStream.send(SparkFlowMessages.IIPSocket(false,id,component.uuid));
+    this.iipStream.emit(SparkFlowMessages.IIPSocket(false,id,component.uuid));
     return sock;
   }
 
@@ -1281,7 +1286,7 @@ class Network extends FlowNetwork{
     var socket = this.filterIIPSocket(alias);
     if(socket != null) socket.socket.send(data);
 
-    this.infoStream.send(SparkFlowMessages.IIP(true,alias));
+    this.iipStream.emit(SparkFlowMessages.IIP(true,alias));
     return socket;
   }
 
@@ -1291,7 +1296,7 @@ class Network extends FlowNetwork{
     var data,uuid = this.uuidRegister.get(alias);
     data = this.iipDataIterator.remove(uuid,IIPDataFilter);
     if(n != null) n(data);
-    this.infoStream.send(SparkFlowMessages.IIP(false,alias));
+    this.iipStream.emit(SparkFlowMessages.IIP(false,alias));
     return data;
   }
 
@@ -1305,7 +1310,7 @@ class Network extends FlowNetwork{
       this.IIPackets.clear();
     });
  
-    this.infoStream.send({ 'type':"sendInitial", 'message': 'sending out all initials' });
+    this.iipStream.send({ 'type':"sendInitial", 'message': 'sending out all initials' });
   }
 
   dynamic add(FlowComponent a,String id,[Function n]){
@@ -1314,7 +1319,7 @@ class Network extends FlowNetwork{
     this.components.bind(node,this.placeholder,1);
     this.uuidRegister.add(id,a.uuid);
     this.addIIPSocket(a,id,n);
-    this.infoStream.send(SparkFlowMessages.component('addComponent',id,a.uuid));
+    this.componentStream.emit(SparkFlowMessages.component('addComponent',id,a.uuid));
     return node;
   }
 
@@ -1326,9 +1331,10 @@ class Network extends FlowNetwork{
       if(n != null) n(_);
       _.data.detach();
       this.components.eject(_);
-    this.infoStream.send(SparkFlowMessages.component('removeComponent',s,_.data.uuid));
+      this.componentStream.emit(SparkFlowMessages.component('removeComponent',s,_.data.uuid));
     }).catchError((e){
-      this.errorStream.send({'type':'network-remove', 'error': e, 'component': a });
+      this.componentStream.emit({'type':'network-remove', 'error': e, 'component': a });
+      // this.networkStream.send({'type':'network-remove', 'error': e, 'component': a });
     });
   }
 
@@ -1344,10 +1350,10 @@ class Network extends FlowNetwork{
           var from = _[0], to = _[1];
           from.data.bind(aport,to.data,bport,sockid);
           this.components.bind(from,to,2);
-          this.infoStream.send(SparkFlowMessages.network('connect',a,b,bport,aport,sockid));
+          this.connectionStream.emit(SparkFlowMessages.network('connect',a,b,bport,aport,sockid));
           return _;
         }).catchError((e){
-          this.infoStream.send(SparkFlowMessages.network('connect',a,b,bport,aport,sockid,e));
+          this.connectionStream.emit(SparkFlowMessages.network('connect',a,b,bport,aport,sockid,e));
       });
     }; 
 
@@ -1366,10 +1372,10 @@ class Network extends FlowNetwork{
         var from = _[0], to = _[1];
         from.data.unbind(aport,to.data,bport,sockid);
         this.components.unbind(from,to,2);
-        this.infoStream.send(SparkFlowMessages.network('disconnect',a,b,bport,aport,sockid));
+        this.connectionStream.emit(SparkFlowMessages.network('disconnect',a,b,bport,aport,sockid));
         return _;
       }).catchError((e){
-        this.infoStream.send(SparkFlowMessages.network('disconnect',a,b,bport,aport,sockid,e));
+        this.connectionStream.emit(SparkFlowMessages.network('disconnect',a,b,bport,aport,sockid,e));
       });
     };
 
@@ -1390,17 +1396,20 @@ class Network extends FlowNetwork{
   }
 
   Future freeze(){
-    if(this.isFrozen && this._whenFrozen != null) return this.whenFrozen;
+    if(this.isFrozen) return this.whenFrozen;
 
     // if(this.isAlive && this._whenAlive != null) this.whenAlive.then((){
     // });
-    var completer = this._whenFrozen = new Completer();
+    var completer = this._whenFrozen = (!this._whenFrozen.isCompleted ? this._whenFrozen : new Completer());
     this.connectionsCompiler.whenComplete((_){
 
       if(this.isFrozen || this.isDead){
          completer.complete(this);
          return completer.future;
       }
+
+      this._whenAlive = new Completer();
+      this._whenDead = new Completer();
 
       this.components.cascade((it){
           if(it.current.data == this.placeholder.data) return;
@@ -1409,8 +1418,10 @@ class Network extends FlowNetwork{
         completer.complete(this);
       });
 
+
       this.stateManager.switchState('frozen');
-      this.infoStream.send({ 'type':"freezeNetwork", 'message': 'freezing/pausing network operations'});
+      this.networkStream.emit({ 'type':"freezeNetwork", 'message': 'freezing/pausing network operations'});
+      this.onFrozen.emit(this);
       this.lockNetworkStreams();
       return completer.future;
     },(e){ throw e; });
@@ -1419,15 +1430,18 @@ class Network extends FlowNetwork{
   }
 
   Future shutdown(){
-    if(this.isDead && this._whenDead != null) return this.whenDead;
+    if(this.isDead) return this.whenDead;
 
-    var completer = this._whenDead = new Completer();
+    var completer = this._whenDead = (!this._whenDead.isCompleted ? this._whenDead : new Completer());
     this.disconnectionsCompiler.whenComplete((_){
 
         if(this.isDead){
-         completer.complete(this);
-         return completer.future;
+           completer.complete(this);
+           return completer.future;
         }
+
+        this._whenAlive = new Completer();
+        this._whenFrozen = new Completer();
 
         this.components.cascade((it){
             if(it.current.data == this.placeholder.data) return;
@@ -1436,7 +1450,8 @@ class Network extends FlowNetwork{
           completer.complete(this);
         });
         this.stateManager.switchState('dead');
-        this.infoStream.send({ 'type':"shutdownNetwork", 'message': 'shutting down/killing network operations'});
+        this.networkStream.emit({ 'type':"shutdownNetwork", 'message': 'shutting down/killing network operations'});
+        this.onDead.emit(this);
         this.stopStamp = new DateTime.now();
 
         return completer.future;
@@ -1446,12 +1461,10 @@ class Network extends FlowNetwork{
   }
 
   Future boot(){
-    if(this.isAlive && this._whenAlive != null) return this.whenAlive;
+    if(this.isAlive) return this.whenAlive;
 
-    var completer = this._whenAlive = new Completer();
+    var completer  = this._whenAlive = (!this._whenAlive.isCompleted ? this._whenAlive : new Completer());
     this.connectionsCompiler.whenComplete((_){
-
-      // var pack = {'components':_,'network':this};
 
       if(this.isAlive){
          completer.complete(this);
@@ -1459,6 +1472,9 @@ class Network extends FlowNetwork{
       }
 
       if(this.isFrozen || this.isDead){
+        this._whenDead = new Completer();
+        this._whenFrozen = new Completer();
+
         this.components.cascade((it){
           if(it.current.data == this.placeholder.data) return;
           it.current.data.boot();
@@ -1469,7 +1485,8 @@ class Network extends FlowNetwork{
 
       this.sendInitials();
       this.stateManager.switchState('alive');
-      this.infoStream.send({ 'type':"bootingNetwork", 'message': 'booting network operations'});
+      this.networkStream.emit({ 'type':"bootingNetwork", 'message': 'booting network operations'});
+      this.onAlive.emit(this);
       this.unlockNetworkStreams();
       this.startStamp = new DateTime.now();
 
@@ -1507,11 +1524,37 @@ class Network extends FlowNetwork{
 
 /*class for component*/
 class Component extends FlowComponent{
-  final String uuid = hub.Hub.randomString(7);
   var network;
 
   
   static create([String id]) => new Component(id);
+  static createFrom(Map m) => new Component.From(m);
+
+  factory Component.From(Map meta){
+    var payload = new hub.MapDecorator.from(meta);
+
+    if(!payload.has('ports')) throw "lacks port information";
+    if(!payload.has('id')) throw "lacks id information";
+
+    var proto = Component.create(payload.get('id'));
+
+    if(proto.portClass.length != payload.get('portClass').length){
+        proto.portClass.clear();
+        proto.portClass.addAll(payload.get('portClass'));
+    }
+
+    var defaultPorts = new Map.from(proto.ports.storage);
+    proto.alias.flush();
+    proto.ports.flush();
+    payload.get('ports').forEach((n,k){
+      var port = defaultPorts[n] == null ? new Port(n,proto.id) : defaultPorts[n];
+      port.setClass(k['type']);
+      proto.makePort(n,k['type'],port);
+      proto.renamePort(n,k['alias']);
+    });
+    
+    return proto;
+  }
 
   Component([String id]): super((id == null ? 'Component' : id)){
     this.network = Network.create(this.id+'-Subnet');
@@ -1526,7 +1569,6 @@ class Component extends FlowComponent{
     this.alias.add('option','option');
     this.alias.add('err','err');
 
-    this.metas.add('uuid',this.uuid);
   }
   
   Future boot(){
@@ -1581,6 +1623,8 @@ class Component extends FlowComponent{
       this.ports.add(this.alias.get(id),port);
     }
 
+    (this.metas.has('ports') ? this.metas.update('ports',this.getPortClassList()) : 
+      this.metas.add('ports',this.getPortClassList()));
     return this.ports.get(this.alias.get(id));
   }
   
@@ -1607,7 +1651,7 @@ class Component extends FlowComponent{
     }
   }
 
-  String get UID => this.metas.get('id')+'#'+this.metas.get('uuid');
+ 
 
 }
 
@@ -1639,14 +1683,24 @@ class ComponentLists{
     this.enableRemove();
   }
 
-  void add(String alias,Component a){
-    if(this.tree.has(alias)) return null;
-    this.tree.add(alias,a);
+  bool rename(String old,String newn){
+    if(!this.tree.has(old) || this.tree.has(newn)) return false;
+    var comp = this.tree.get(old);
+    this.add(newn,comp);
+    this.remove(old);
+    return true;
   }
 
-  void remove(String alias){
-    if(!this.tree.has(alias)) return null;
+  bool add(String alias,Component a){
+    if(this.tree.has(alias)) return false;
+    this.tree.add(alias,a);
+    return true;
+  }
+
+  bool remove(String alias){
+    if(!this.tree.has(alias)) return false;
     this.tree.destroy(alias);
+    return true;
   }
 
   bool has(String alias){

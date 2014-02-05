@@ -13,12 +13,16 @@ class GuardedFile{
 	static create(n,m) => new GuardedFile(path:n,readonly:m);
 
 	GuardedFile({String path, bool readonly: false}){
-		this.options = new MapDecorator.from({'readonly': readonly, 'path':paths.normalize(path)});
+		this.options = new MapDecorator.from({'readonly': readonly, 'path':path});
 		this.f = new File(this.options.get('path'));
 		this.writable = Switch.create();
 		if(!readonly) this.writable.switchOn();
 	}
   
+	Future fsCheck(String path){
+		return new Future.value((FileSystemEntity.typeSync(path) == FileSystemEntityType.NOT_FOUND ? new Exception('NOT FOUND!') : path));
+	}
+
 	Future rename(String name){
 		if(!this.writable.on()) return null;
 		return this.f.rename(name);
@@ -69,7 +73,7 @@ class GuardedFile{
 	}
 
 	Future readAsString([Encoding enc]){
-		return this.f.readAsString(encoding: enc);
+		return this.f.readAsString(encoding: Hub.switchUnless(enc, UTF8));
 	}
 
 	dynamic readAsStringSync([Encoding enc]){
@@ -147,6 +151,7 @@ class GuardedFile{
 	dynamic get lengthSync => this.f.lengthSync();
 
 	bool get isWritable => this.writable.on();
+	bool get isFile => true;
 }
 
 class GuardedDirectory{
@@ -158,10 +163,14 @@ class GuardedDirectory{
 	static create(n,m) => new GuardedDirectory(path:n,readonly:m);
 	
 	GuardedDirectory({String path, bool readonly: false}){
-    this.options = new MapDecorator.from({'readonly':readonly, 'path':paths.normalize(path)});
+    this.options = new MapDecorator.from({'readonly':readonly, 'path':path});
 		this.d = new Directory(this.options.get('path'));
 		this.writable = Switch.create();
 		if(!readonly) this.writable.switchOn();
+	}
+
+	Future fsCheck(String path){
+		return new Future.value((FileSystemEntity.typeSync(path) == FileSystemEntityType.NOT_FOUND ? new Exception('NOT FOUND!') : path));
 	}
 
 	dynamic createDirSync([bool f]){
@@ -264,6 +273,8 @@ class GuardedDirectory{
 	bool get isWritable => this.writable.on();
 
 	String get path => this.d.path;
+
+	bool get isDirectory => true;
 }
 
 
@@ -278,6 +289,10 @@ class GuardedFS{
 		this.dir = GuardedDirectory.create(path,readonly);
 	}
 
+	Future fsCheck(String path){
+		return new Future.value((FileSystemEntity.typeSync(path) == FileSystemEntityType.NOT_FOUND ? new Exception('NOT FOUND!') : path));
+	}
+	
 	dynamic File(String path){
 		if(this.cache.storage.length > 100) this.cache.flush();
 		var dir = this.cache.get(path);
@@ -290,7 +305,7 @@ class GuardedFS{
 	dynamic Dir(String path,[bool rec]){
 		if(this.cache.storage.length > 100) this.cache.flush();
 		var dir = this.cache.get(path);
-		if(dir != null && dir is GuardedDirectory) return dir; 
+		if(dir != null && dir is GuardedDirectory) return new Future.value(dir); 
 		dir = this.dir.createNewDir(path,rec);
 		return dir.then((_){
 		   this.cache.add(path,_);

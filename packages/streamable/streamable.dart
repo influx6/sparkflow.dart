@@ -132,11 +132,14 @@ class Streamable<T> extends Streamer<T>{
   final Distributor initd = Distributor.create('streamable-emitInitiation');
   final Distributor drained = Distributor.create('streamable-drainer');
   final Distributor closed = Distributor.create('streamable-close');
+  final Distributor beginSegment = Distributor.create('streamable-section');
+  final Distributor endSegment = Distributor.create('streamable-section');
   final Distributor resumer = Distributor.create('streamable-resume');
   final Distributor pauser = Distributor.create('streamable-pause');
   final Distributor listeners = Distributor.create('streamable-listeners');
-  dynamic iterator;
   StateManager state,pushState,flush;
+  dynamic iterator;
+  Function _ender;
   
   static create([n]) => new Streamable(n);
 
@@ -215,6 +218,16 @@ class Streamable<T> extends Streamer<T>{
     this.flush.switchState('no');
     this.pushState.switchState("strict");
     
+    this._ender = (){
+      this.state.switchState('closed');
+      this.drained.emit(true);
+      this.closed.emit(true);
+      this.closed.free();
+      this.drained.lock();
+      this.closed.lock();
+//      this.reset();
+    };
+    
   }
 
   Mutator cloneTransformer(){
@@ -247,6 +260,16 @@ class Streamable<T> extends Streamer<T>{
     });  
   }
   
+  void segmentBegin(){
+    this.beginSegment.emit(true);
+    return null;
+  }
+  
+  void segmentEnd(){
+    this.endSegment.emit(true);
+    return null;
+  }
+  
   void on(Function n){
     this.listeners.on(n);
     this.push();
@@ -274,7 +297,11 @@ class Streamable<T> extends Streamer<T>{
   }
   
   void pushDelayed(){
-
+    if((!this.hasListeners && this.streamClosing) || (this.streamClosing && this.streams.isEmpty)){
+      this._ender();
+      return null;
+    }
+    
     if(!this.hasListeners || this.streams.isEmpty || this.streamFiring || this.streamPaused || this.streamClosed) return null;
 
     if(this.streams.isEmpty && !this.streamClosing) return null;
@@ -285,12 +312,7 @@ class Streamable<T> extends Streamer<T>{
       this.listeners.emit(this.streams.removeHead().data);
     
     if(this.streamClosing && this.streams.isEmpty){
-      this.state.switchState('closed');
-      this.drained.emit(true);
-      this.closed.emit(true);
-      this.closed.free();
-      this.drained.lock();
-      this.closed.lock();
+      this._ender();
       return null;
     }else this.push();
     
@@ -299,14 +321,16 @@ class Streamable<T> extends Streamer<T>{
   }
   
   void pushStrict(){
-        
+    
+    if((!this.hasListeners && this.streamClosing) || (this.streamClosing && this.streams.isEmpty)){
+      this._ender();
+      return null;
+    }
+    
     if(!this.hasListeners || this.streams.isEmpty || this.streamFiring || this.streamPaused || this.streamClosed) return null;
     
     if(this.streamClosing){
-      this.state.switchState('closed');
-      this.drained.emit(true);
-      this.closed.emit(true);
-      this.reset();
+      this._ender();
       return null;
     }  
     
@@ -338,7 +362,7 @@ class Streamable<T> extends Streamer<T>{
     this.initd.free();
     this.drained.free();
   }
-  
+    
   void reset(){
     if(!this.streamClosed) return;  
     this.closeListeners();
@@ -361,6 +385,7 @@ class Streamable<T> extends Streamer<T>{
   void end(){
     if(this.streamClosed) return null;
     this.state.switchState('closing');
+    this.push();
     this.initd.lock();
   }
   
@@ -503,11 +528,172 @@ class Subscriber<T> extends Listener<T>{
   }
 }
 
+class GroupedStream{
+  final meta = new MapDecorator();
+  final Streamable data = Streamable.create();  
+  final Streamable end = Streamable.create();  
+  final Streamable begin = Streamable.create();
+  StateManager state;
+  StateManager delimited;
+  Streamable stream;
+   
+  static create() => new GroupedStream();
+  
+  GroupedStream(){
+    this.state = StateManager.create(this);
+    this.delimited = StateManager.create(this);
+    
+    this.delimited.add('yes', {
+      'allowed': (r,c){ return true; }
+    });
+ 
+    this.delimited.add('no', {
+      'allowed': (r,c){ return false; }
+    });
+    
+    this.state.add('lock', {
+      'ready': (r,c){ return false; }
+    });    
+    
+    this.state.add('unlock', {
+      'ready': (r,c){ return true;},
+    });
+    
+    this.begin.initd.on((n){
+      if(!this.state.run('ready')) this.data.resume();
+      this.state.switchState("lock");
+      this.data.pause();
+    });
+    
+    this.end.initd.on((n){
+      this.data.resume();
+      this.state.switchState("unlock");
+    });
+    
+    this.stream = MixedStreams.combineUnOrder([begin,data,end])((tg,cg){
+      return this.state.run('ready');
+    },null,(cur,mix,streams,ij){   
+      if(this.delimited.run('allowed')) return mix.emit(cur.join(this.meta.get('delimiter')));
+      return mix.emitMass(cur);
+    });
+    
+    this.setDelimiter('/');
+    this.delimited.switchState("no");
+    this.state.switchState("unlock");
+  }
+
+  void enableFlushing(){
+    this.stream.enableFlushing();  
+  }
+  
+  void disableFlushing(){
+    this.stream.disableFlushing();  
+  }
+  
+  void setMax(int m){
+    this.stream.setMax(m);  
+  }
+  
+  dynamic get dataTransformer => this.data.transformer;
+  dynamic get endGroupTransformer => this.end.transformer;
+  dynamic get beginGroupTransformer => this.begin.transformer;
+  dynamic get streamTransformer => this.stream.transformer;
+
+  dynamic get dataDrained => this.data.drained;
+  dynamic get endGroupDrained => this.end.drained;
+  dynamic get beginGroupDrained => this.begin.drained;
+  dynamic get streamDrained => this.stream.drained;
+
+  dynamic get dataInitd => this.data.initd;
+  dynamic get endGroupInitd => this.end.initd;
+  dynamic get beginGroupInitd => this.begin.initd;
+  dynamic get streamInitd => this.stream.initd;
+  
+  dynamic get dataClosed => this.data.closed;
+  dynamic get endGroupClosed => this.end.closed;
+  dynamic get beginGroupClosed => this.begin.closed;
+  dynamic get streamClosed => this.stream.closed;
+
+  dynamic get dataPaused => this.data.pauser;
+  dynamic get endGroupPaused => this.end.pauser;
+  dynamic get beginGroupPaused => this.begin.pauser;
+  dynamic get streamPaused => this.stream.pauser;
+
+  dynamic get dataResumed => this.data.resumer;
+  dynamic get endGroupResumed => this.end.resumer;
+  dynamic get beginGroupResumed => this.begin.resumer;
+  dynamic get streamResumed => this.stream.resumer;
+
+  void whenDrained(Function n){
+    this.stream.whenDrained(n);  
+  }
+  
+  void whenClosed(Function n){
+    this.stream.whenClosed(n);  
+  }
+  
+  void whenInitd(Function n){
+    this.stream.whenInitd(n);  
+  }
+  
+  void setDelimiter(String n){
+    this.meta.destroy('delimiter');
+    this.meta.add('delimiter', n);
+  }
+  
+  void enableDelimiter(){
+    this.delimited.switchState('yes');
+  }
+  
+  void disableDelimiter(){
+    this.delimited.switchState("no");
+  }
+  
+  dynamic metas(String key,[dynamic value]){
+    if(value == null) return this.meta.get(key);
+    this.meta.add(key,value);
+  }
+
+  void beginGroup([group]){
+    this.begin.emit(group);
+  }
+
+  void endGroup([group]){
+    this.end.emit(group);
+  }
+  
+  void emit(data){
+    this.data.emit(data);
+  }
+  
+  void emitMass(List a){
+    this.data.emitMass(a);  
+  }
+  
+  void pause(){
+    this.stream.pause();
+  }
+  
+  void resume(){
+    this.stream.resume();
+  }
+  
+  void on(Function n){
+    this.stream.on(n);  
+  }
+  
+  void off(Function n){
+    this.stream.off(n);
+  }
+  
+  bool get hasConnections => this.stream.hasListeners;
+}
+
 
 class MixedStreams{
   
   static Function mixed(List<Streamable> sets){
-    return (Injector<T> injectible){
+    return (Injector injectible){
       return (fn,[fns]){
         var mixed = Streamable.create();
         var injector  = injectible;
