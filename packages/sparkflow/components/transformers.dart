@@ -1,15 +1,46 @@
-library sparkflow.components;
+library sparkflow.transformers;
 
 import 'package:hub/hub.dart';
 import 'package:sparkflow/sparkflow.dart';
 
-class Repeater extends Component{
-
-  static create() => new Repeater();
+//this is a necessity and should be declared either as a static function in the class,to 
+//add the necessary components to the SparkRegistery,unforunately there is no easy way
+//to automatically run this once a library is imported;
+class Transformers{
   
-  Repeater(): super("Repeater"){
-    this.meta('desc','a simple synchronous repeater component');
-    this.loopPorts('in','out');
+  static void registerComponents(){
+    SparkRegistry.register("transformers", 'StringPrefixer', StringPrefixer.create);
+    SparkRegistry.register("transformers", 'Prefixer', Prefixer.create);
+    SparkRegistry.register("transformers", 'ApplyFunction', ApplyFunction.create);
+  }
+  
+}
+
+
+class ApplyFunction extends Component{
+  Transformable handle;
+
+  static create() => new ApplyFunction();
+  
+  ApplyFunction(){
+    this.meta('desc','applies a function to every input stream from the inport');
+    this.init();
+  }
+  
+  void init(){
+    var hin = this.port('in'), hout = this.port('out'), hop = this.port('option'), herr = this.port('err');
+
+    hop.tap((n){
+      if(n is Function){
+        if(Valids.exists(handle)) return this.handle.changeFn(n);
+        this.handle = Transformable.create(n);
+      }else herr.send(new Exception('$n is not a type of function!'));
+    });
+
+    hop.dataDrained.once((n){
+        hout.dataTransformer.on(this.handle.out);
+        hin.bindPort(hout);
+    });
   }
   
 }
@@ -57,13 +88,4 @@ class StringPrefixer extends Prefixer{
   
 }
 
-class GroupPackets extends Component{
 
-    static create([i]) => new GroupPackets(i);
-    
-    GroupPackets([String id]) : super(Hub.switchUnless(id,'GroupPackets')){
-
-    }
-
-    
-}

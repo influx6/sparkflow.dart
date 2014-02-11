@@ -16,7 +16,7 @@ packages:
   hub:
     description: hub
     source: hosted
-    version: "0.6.3"
+    version: "0.6.7"
   path:
     description: path
     source: hosted

@@ -36,6 +36,7 @@ void main(){
   feeder2.send('4');
 
 //  repeater.getPortClassList();
+//  print(repeater.toMeta);
   var a = Component.createFrom(repeater.toMeta);
   
 }

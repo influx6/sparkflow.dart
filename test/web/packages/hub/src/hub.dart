@@ -4,7 +4,13 @@ import 'dart:mirrors';
 import 'dart:math' as math;
 import 'dart:async';
 
+part 'validators.dart';
+part 'enums.dart';
+part 'functionals.dart';
+
 Function _empty(t,s){}
+var _smallA = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
+var _bigA = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
 
 //StateObject with map get and setters
 class State{
@@ -641,25 +647,14 @@ class Counter{
   }
 }
 
-var _smallA = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
-var _bigA = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
-
 class Hub{
   
   static Map merge(Map a,Map b,{bool override: true}){
-    var merged = new Map.from(a);
-    b.forEach((n,k){
-      if(!override && !!merged.containsKey(n)) return;
-      merged[n] = k;
-    });
-
-    return merged;
+    return Enums.merge(a, b, override: override);
   }
 
   static void cycle(int times,Function fn){
-    fn(times);
-    if(times > 0) return Hub.cycle((times - 1), fn); 
-    return null;
+    return Funcs.cycle(times, fn);
   }
   
   static String randomStringsets(int len,[String separator]){
@@ -813,108 +808,19 @@ class Hub{
 
 	
 	static void eachAsync(List a,Function iterator,[Function complete]){
-    if(a.length <= 0){
-      if(complete != null) complete(a);
-      return null;    
-    }
-    
-    var total = a.length,i = 0;
-    
-    a.forEach((f){
-      iterator(f,i,a,(err){
-          if(err){
-            if(complete != null) complete(a);
-            return null;
-          }
-          total -= 1;
-          if(total <= 0){
-            if(complete != null) complete(a);
-            return null;
-          }
-      });  
-      i += 1;
-    });
-    
+    return Enums.eachAsync(a, iterator,complete);
   }
 
 	 static void eachAsyncMap(Map a,Function iterator,[Function complete]){
-	    if(a.length <= 0){
-	      if(complete != null) complete(a);
-	      return null;    
-	    }
-	    
-	    var total = a.length;
-	    
-	    a.forEach((f,v){
-	      iterator(v,f,a,(err){
-          if(err){
-            if(complete != null) complete(a);
-            return null;
-          }
-          total -= 1;
-          if(total <= 0){
-            if(complete != null) complete(a);
-            return null;
-          }
-      });  
-    });
-    
+    return Enums.eachAsyncMap(a, iterator,complete);
   }
 	 
   static void eachSyncMap(Map a,Function iterator, [Function complete]){
-    if(a.length <= 0){
-      if(complete != null) complete(a);
-      return null;    
-    }
-    
-    var keys = a.keys.toList();
-    var total = a.length,step = 0,tapper;
-        
-    var fuse = (){
-      var key = keys[step];
-      iterator(a[key],key,a,(err){
-        if(err){
-          if(complete != null) complete(a);
-          return null;
-        }
-        step += 1;
-        if(step == total){
-          if(complete != null) complete(a);
-           return null;
-        }else return tapper();
-      });
-    };
-     
-    tapper = (){ return fuse(); };
-
-    return fuse();
+    return Enums.eachSyncMap(a, iterator,complete);
   }
   
 	static void eachSync(List a,Function iterator, [Function complete]){
-	  if(a.length <= 0){
-      if(complete != null) complete(a);
-      return null;    
-	  }
-	  
-	  var total = a.length,step = 0,tapper;
-	  	  
-	  var fuse = (){
-	    iterator(a[step],step,a,(err){
-	      if(err){
-	        if(complete != null) complete(a);
-          return null;
-	      }
-        step += 1;
-	      if(step == total){
-          if(complete != null) complete(a);
-	         return null;
-	      }else return tapper();
-	    });
-	  };
-	   
-	  tapper = (){ return fuse(); };
-
-	  return fuse();
+	  return Enums.eachSync(a, iterator,complete);
 	}
 	
 	static Future eachFuture(dynamic a,Function validator){
@@ -936,32 +842,15 @@ class Hub{
 	}
 	
 	static Future captureEachFuture(dynamic a,Function validator){
-		var res = [];
-		
-		if(a.isEmpty) return new Future.value(true);
-		
-		if(a is List){
-			a.forEach((n){
-				res.add(new Future.value(validator(n)));
-			});
-		}
-		if(a is Map){
-			a.forEach((n,v){
-				res.add(new Future.value(validator(n,v)));
-			});
-		}
-		
-		return Future.wait(res);
+		return Enums.captureEachFuture(a, validator);   
 	}
 		
   static dynamic switchUnless(m,n){
-    if(m == null) return n;
-    return m;
+    return Funcs.switchUnless(m, n);
   }
 
   static dynamic when(bool f,Function n,[Function m]){
-    if(!!f) return n();
-    return (m != null && m());
+    return Funcs.when(f, n,m);
   }
 
 	static final symbolMatch = new RegExp(r'\(|Symbol|\)');
@@ -1010,148 +899,17 @@ class Hub{
 		return Hub.decryptSymbol(reflectClass(m).simpleName);
   }
 
-  static Function matchMapConditions([Map<String,Function> sets]){
-    return (r){
-      var future  = new Completer();
-      Hub.eachSyncMap(sets,(e,i,o,fn){
-        var state = e(r);
-        if(!!state) return fn(false);
-        future.completeError(new Exception("Function check at $i failed!"));
-      },(o){
-        future.complete(r);
-      });
-    };
-  }
-  
-  static Function createMessageMatcher(String name,String failmessage,bool n(i)){
-    return (e){
-      if(!!n(e)) return true;
-      return {
-        "name": name,
-        "state": "Failed!",
-        "message": failmessage
-      };   
-    };
-  }
-  
-  static Function matchListConditions([List<Function> sets]){
-    return (r){
-      var future  = new Completer();
-      Hub.eachSync(sets,(e,i,o,fn){
-        var state = e(o);
-        if(!!state) return fn(false);
-        future.completeError(new Exception("Function check at index $i failed!"));
-      },(o){
-        future.complete(r);
-      });
-    };
-  }
-  
-  //returns a future with a map 
-  static Function captureMapConditions([Map<String,Function> sets]){
-    return (r){
-      var errors = {}, future  = new Completer<Map>();
-      Hub.eachSyncMap(sets,(e,i,o,fn){
-        var state = e(r);
-        if(state != true) errors[i] = state; 
-      },(o){
-        future.complete(errors);
-      });
-      return future.future;
-    };
-  }
-
-  static Function captureListConditions([List<Function> sets]){
-    return (r){
-      var errors = [], future  = new Completer<List>();
-      Hub.eachSync(sets,(e,i,o,fn){
-        var state = e(o);
-        if(state != true) errors.add(state);
-      },(o){
-        future.complete(errors);
-      });
-      return future.future;
-    };
-  }
-  
-  static Function compose(Function n,Function m){
-     return (v){
-        return n(m(v));
-     };
-  }
-  
-  static Function dualPartial(Function m){
-      return (e){
-        return (k){
-          return m(e,k);
-        };
-      };
-  }
-  
-  static Function dualCurry(Function m){
-    return (k){
-      return (e){
-        return m(k,e);
-      };
-    };
-  }
-  
   static List map(dynamic m,Object mod(i,j,k)){
-    var mapped = [];
-    if(m is List){
-      Hub.eachAsync(m,(e,i,o,fn){
-         mapped.add(mod(e,i,o));
-         return fn(false);
-      });
-    }
-
-    if(m is Map){
-      Hub.eachAsyncMap(m,(e,i,o,fn){
-         mapped.add(mod(e,i,o));
-         return fn(false);
-      });
-    }
-    return mapped;
+    return Enums.map(m, mod);
   }
 
   static List filterValues(dynamic m,bool mod(i,j,k)){
-    var mapped = [];
+    return Enums.filterValues(m, mod);
 
-    if(m is List){
-      Hub.eachAsync(m,(e,i,o,fn){
-         if(!!mod(e,i,o)) mapped.add(e);
-         return fn(false);
-      });
-    }
-
-    if(m is Map){
-      Hub.eachAsyncMap(m,(e,i,o,fn){
-         if(!!mod(e,i,o)) mapped.add(e);
-         return fn(false);
-      });
-    }
-
-    return mapped;
   }
 
   static List filterKeys(dynamic m,bool mod(i,j,k)){
-    var mapped = [];
-
-    if(m is List){
-      Hub.eachAsync(m,(e,i,o,fn){
-         if(!!mod(e,i,o)) mapped.add(i);
-         return fn(false);
-      });
-    }
-
-    if(m is Map){
-      Hub.eachAsyncMap(m,(e,i,o,fn){
-         if(!!mod(e,i,o)) mapped.add(i);
-         return fn(false);
-      });
-    }
-
-    return mapped;
+    return Enums.filterKeys(m, mod);
   }
   
 }
