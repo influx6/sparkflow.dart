@@ -30,10 +30,8 @@ void main(){
 
   network.freeze();
   //listen to info streams for update
-  var buffer = new StringBuffer();
   network.networkStream.on((n){
     print('#Updates: \n $n \n');
-    buffer.clear();
   });
 
   network.boot();
