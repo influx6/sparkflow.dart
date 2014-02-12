@@ -1874,7 +1874,7 @@ class Component extends FlowComponent{
     this.ports.onAll((k,n){
        n.resume();
     });
-    this.stateStream.emit({'type':'component-boot','id': this.id,'uuid':this.metas.get('uuid')});
+    this.stateStream.emit({'type':'boot','id': this.id,'uuid':this.metas.get('uuid')});
     return this.network.boot();
   }
 
@@ -1882,7 +1882,7 @@ class Component extends FlowComponent{
     this.ports.onAll((k,n){
        n.pause();
     });   
-    this.stateStream.emit({'type':'component-freeze','id': this.id,'uuid':this.metas.get('uuid')});
+    this.stateStream.emit({'type':'freeze','id': this.id,'uuid':this.metas.get('uuid')});
     return this.network.freeze();
   }
 
@@ -1890,7 +1890,7 @@ class Component extends FlowComponent{
     this.ports.onAll((k,n){
        n.close();
     });
-    this.stateStream.emit({'type':'component-shutdown','id': this.id,'uuid':this.metas.get('uuid')});
+    this.stateStream.emit({'type':'shutdown','id': this.id,'uuid':this.metas.get('uuid')});
     return this.network.shutdown();
   }
 

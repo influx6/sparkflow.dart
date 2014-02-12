@@ -15,18 +15,18 @@ void main(){
 
   var network = Network.create("testBed");
   
-  network.add(rep1,'repeater',(meta){
+  network.addComponentInstance(rep1,'repeater',(meta){
   	//print('internal initial socket: ${meta.toString().split(',').join('\n')}');
   });
     
-  network.add(rep2,'prefixer',(meta){
+  network.addComponentInstance(rep2,'prefixer',(meta){
   	//print('internal initial socket: ${meta.toString().split(',').join('\n')}');
 
   	//attach the IIP to the component's option port
   	//meta.socket.attachPort(meta.component.port('option'));
   });
 
-  network.add(cosmo,'cosmo',(meta){
+  network.addComponentInstance(cosmo,'cosmo',(meta){
   	//print('internal initial socket: ${meta.toString().split(',').join('\n')}');
   });
 

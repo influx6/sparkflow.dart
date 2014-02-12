@@ -27,7 +27,7 @@
   
 ####Todo:
   - Development of sets of core components (concat,prefixers,loopers,..etc)
-  - Development of an intermediate script language for easy creation of applications or adopt noflo fbp format
+  - Development of an intermediate dsl for easy creation of applications or adopt noflo fbp format
   - Development of core web components for rapid development of web applications (client-sided and server-sided)
   - Improvement of underline structure and integration with a UI(possible noflo-UI)
   - .. and so much more :)
