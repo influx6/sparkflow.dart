@@ -6,7 +6,7 @@ void main(){
   
   var network = Network.create('example');
 
-  network.infoStream.disconnect();
+  network.networkStream.pause();
   
   var loop = Component.create('loop');
   loop.renamePort('in','suck');
@@ -17,9 +17,9 @@ void main(){
 
   var cosmo = Component.create('cosmo');
 
-  network.add(loop,'loopback');
-  network.add(costa,'costa');
-  network.add(cosmo,'cosmo');
+  network.addComponentInstance(loop,'loopback');
+  network.addComponentInstance(costa,'costa');
+  network.addComponentInstance(cosmo,'cosmo');
   
   network.filter('cosmo').then((_){
     assert(_.data.UID == cosmo.UID);
@@ -31,7 +31,7 @@ void main(){
   network.freeze();
   //listen to info streams for update
   var buffer = new StringBuffer();
-  network.infoStream.tap((n){
+  network.networkStream.on((n){
     print('#Updates: \n $n \n');
     buffer.clear();
   });

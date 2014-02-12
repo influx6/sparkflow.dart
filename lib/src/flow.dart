@@ -12,6 +12,8 @@ abstract class FlowSocket{
 	void endGroup();
 	void send();
 	void close();
+  void attachPort();
+  void detachPort();
 }
 
 /*base class for ports*/
@@ -22,6 +24,8 @@ abstract class FlowPort{
   void endGroup(data);
   void disconnect();
   void setClass(String m);
+  void bindPort(FlowPort p);
+  void unbindPort(FlowPort p);
 }
 
 abstract class FlowComponent{
@@ -35,7 +39,7 @@ abstract class FlowComponent{
   FlowComponent(id){
     this.metas.add('id',id);
     this.metas.add('uuid',this.uuid);
-    this.metas.add('group','components/component');
+    this.metas.add('group','components/$id');
   }
 
   void setGroup(String g){
@@ -81,12 +85,14 @@ abstract class FlowComponent{
     payload['metas'].remove('ports');
     payload['metas'].remove('uuid');
     payload['metas'].remove('id');
+    payload['metas'].remove('group');
     
     payload['uuid'] = this.metas.get('uuid');
     // payload['desc'] = this.metas.get('desc');
     payload['ports']= {};
-    payload['id'] = payload['name'] = this.id;
+    payload['id'] = this.id;
     payload['uid'] = this.UID;
+    payload['group'] = this.metas.get('group');
     payload['portClass'] = new List.from(this.portClass);
     payload['portLists'] = this.getPortClassList();
     
@@ -238,7 +244,17 @@ class SocketStream{
   dynamic get endGroupInitd => this.end.initd;
   dynamic get beginGroupInitd => this.begin.initd;
   dynamic get streamInitd => this.stream.initd;
-  
+
+  dynamic get dataSegmentBegin => this.data.beginSegment;
+  dynamic get endGroupSegmentBegin => this.end.beginSegment;
+  dynamic get beginGroupSegmentBegin => this.begin.beginSegment;
+  dynamic get streamSegmentBegin => this.stream.beginSegment;
+
+  dynamic get dataSegmentEnd => this.data.endSegment;
+  dynamic get endGroupSegmentEnd => this.end.endSegment;
+  dynamic get beginGroupSgmentEnd => this.begin.endSegment;
+  dynamic get streamSegmentEnd => this.stream.endSegment;
+
   dynamic get dataClosed => this.data.closed;
   dynamic get endGroupClosed => this.end.closed;
   dynamic get beginGroupClosed => this.begin.closed;
@@ -253,6 +269,14 @@ class SocketStream{
   dynamic get endGroupResumed => this.end.resumer;
   dynamic get beginGroupResumed => this.begin.resumer;
   dynamic get streamResumed => this.stream.resumer;
+
+  void segmentBegin(){
+    this.streamSegmentBegin.emit(true);
+  }
+  
+  void segmentEnd(){
+    this.streamSegmentEnd.emit(true);
+  }
 
   void whenDrained(Function n){
     this.stream.whenDrained(n);  
@@ -359,6 +383,24 @@ class Socket extends FlowSocket{
   dynamic get endGroupResumed => this.streams.endGroupResumed;
   dynamic get beginGroupResumed => this.streams.beginGroupResumed;
   dynamic get mixedResumed => this.streams.streamResumed;
+
+  dynamic get dataSegmentBegin => this.streams.beginSegment;
+  dynamic get endGroupSegmentBegin => this.streams.beginSegment;
+  dynamic get beginGroupSegmentBegin => this.streams.beginSegment;
+  dynamic get mixedSegementBegin => this.streams.beginSegment;
+
+  dynamic get dataSegmentEnd => this.streams.endSegment;
+  dynamic get endGroupSegmentEnd => this.streams.endSegment;
+  dynamic get beginGroupSegmentEnd => this.streams.endSegment;
+  dynamic get mixedSegementEnd => this.streams.endSegment;
+
+  void segmentBegin(){
+    this.streams.segmentBegin();
+  }
+  
+  void segmentEnd(){
+    this.streams.segmentEnd();
+  }
 
   void enableFlushing(){
     this.streams.enableFlushing();  
@@ -480,12 +522,12 @@ class Socket extends FlowSocket{
     return this.filter.has(a,socketFilter);
   }
 
-  void connect(){
+  void resume(){
     this.streams.stream.resume();
     this.continued.emit(true);
   }
   
-  void disconnect(){
+  void pause(){
     this.streams.stream.pause();
     this.halted.emit(true);
   }
@@ -512,8 +554,8 @@ class Socket extends FlowSocket{
 
   void close() => this.end();
 
-  bool get isConnected => this.streams.stream.streamResumed;
-  bool get isDisconnected => this.streams.stream.streamPaused;
+  bool get isResumed => this.streams.stream.streamResumed;
+  bool get isPaused => this.streams.stream.streamPaused;
 
 }
 
@@ -600,6 +642,16 @@ class Port extends FlowPort{
   dynamic get endGroupResumed => this.socket.endGroupResumed;
   dynamic get beginGroupResumed => this.socket.beginGroupResumed;
   dynamic get mixedResumed => this.socket.mixedResumed;
+
+  dynamic get dataSegmentBegin => this.socket.beginSegment;
+  dynamic get endGroupSegmentBegin => this.socket.beginSegment;
+  dynamic get beginGroupSegmentBegin => this.socket.beginSegment;
+  dynamic get streamSegementBegin => this.socket.beginSegment;
+
+  dynamic get dataSegmentEnd => this.socket.endSegment;
+  dynamic get endGroupSegmentEnd => this.socket.endSegment;
+  dynamic get beginGroupSegmentEnd => this.socket.endSegment;
+  dynamic get streamSegementEnd => this.socket.endSegment;
 
   bool boundedToPort(FlowPort a){
     return this.socket.boundedToPort(a);
@@ -762,22 +814,22 @@ class Port extends FlowPort{
     this.socket.off(n);
   }
 
-  void connect(){
+  void resume(){
     if(this.socket == null) return;
-    this.socket.connect();
+    this.socket.resume();
   }
 
-  void disconnect(){
+  void pause(){
     if(this.socket == null) return;
-    this.socket.disconnect();
+    this.socket.pause();
   }
 
-  bool get isConnected{
-    return this.socket.isConnected;
+  bool get isResumed{
+    return this.socket.isResumed;
   }
 
-  bool get isDisconnected {
-    this.socket.isDisconnected; 
+  bool get isPaused{
+    this.socket.isPaused; 
   }
   
   void close(){
@@ -973,6 +1025,7 @@ class SparkFlowMessages{
 }
 
 class Network extends FlowNetwork{
+  final _networkPorts = new hub.MapDecorator();
   //global futures of freze,boot,shutdown
   Completer _whenAlive = new Completer(),_whenFrozen = new Completer(),_whenDead = new Completer();
   //timestamps
@@ -985,16 +1038,13 @@ class Network extends FlowNetwork{
   var placeholder;
   //network StateManager
   var stateManager;
+  //connection map 
+  var connections;
   // map of uuid registers with either unique names or uuid
   final uuidRegister = new hub.MapDecorator();
   //uuid of network
   final String uuid = hub.Hub.randomString(5);
   //final outport for the particular network,optionally usable
-  final Port nout = Port.create('networkOutport');
-  //final inport for the particular network,optionally usable
-  final Port nin = Port.create('networkInport');
-  // the error stream
-  final Port nerr = Port.create('networkError');
   // the network error stream
   final errorStream = Streamable.create();
   final iipStream = Streamable.create();
@@ -1040,6 +1090,17 @@ class Network extends FlowNetwork{
    this.placeholder = this.components.add(PlaceHolder.create('placeholder',hub.Hub.randomString(7)));
    this.uuidRegister.add('placeholder',this.placeholder.data.uuid);
    this.stateManager = hub.StateManager.create(this);
+  
+   this._networkPorts.add('out',Port.create('networkOutport'));
+   this._networkPorts.get('out').setClass('out');
+   //inport for the particular network,optionally usable
+   this._networkPorts.add('in',Port.create('networkInport'));
+   this._networkPorts.get('in').setClass('in');
+   // the error stream
+   this._networkPorts.add('err',Port.create('networkError'));
+   this._networkPorts.get('err').setClass('err');
+   
+   this.connections = ConnectionMeta.create(this);
 
    this.stateManager.add('dead',{
       'frozen': (t,c){ return false; },
@@ -1061,11 +1122,57 @@ class Network extends FlowNetwork{
 
    this.stateManager.switchState('dead');
    this.metas.add('uuid',this.uuid);
+   this.metas.add('id',this.id);
+
+   this.connectionStream.on((e){
+
+     if(e['to'] == '*'){
+
+         if(e['type'] == 'loop' || e['type'] == 'link'){
+           this.connections.addConnection(e['toPort'],e['from'],e['fromPort'],e['socketid']);
+         }
+
+         if(e['type'] == 'unloop' || e['type'] == 'unlink'){
+           this.connections.removeConnection(e['toPort'],e['from'],e['fromPort'],e['socketid']);
+         }
+     }
+
+     if(e['from'] == '*'){
+
+         if(e['type'] == 'loop' || e['type'] == 'link'){
+           this.connections.addConnection(e['fromPort'],e['to'],e['toPort'],e['socketid']);
+         }
+
+         if(e['type'] == 'unloop' || e['type'] == 'unlink'){
+           this.connections.removeConnection(e['fromPort'],e['to'],e['toPort'],e['socketid']);
+         }
+     }
+     
+   });
+
   }
   
+  FlowPort port(String n) => this._networkPorts.get(n);
+  
+  FlowPort makePort(String n,String type){
+    if(this._networkPorts.has(n)) return null;
+    var port = Port.create(n, this.id);
+    port.setClass(type);
+    this._networkPorts.add(n, port);
+    return port;
+  }
+  
+  FlowPort removePort(String n){
+    if(n == ('in' || 'err' || 'out')) return null;
+    this._networkPorts.destroy(n);
+  }
+  
+  FlowPort get nout => this._networkPorts.get('out');
+  FlowPort get nin => this._networkPorts.get('in');
+  FlowPort get nerr => this._networkPorts.get('err');
+  
   void lockNetworkStreams(){
-    this.nout.disconnect();
-    this.nin.disconnect();
+    this._networkPorts.onAll((i,e){ e.pause(); });
     this.errorStream.pause();
     this.connectionStream.pause();
     this.componentStream.pause();
@@ -1074,8 +1181,7 @@ class Network extends FlowNetwork{
   }
 
   void unlockNetworkStreams(){
-    this.nout.connect();
-    this.nin.connect();
+    this._networkPorts.onAll((i,e){ e.resume(); });
     this.errorStream.resume();
     this.connectionStream.resume();
     this.componentStream.resume();
@@ -1084,8 +1190,7 @@ class Network extends FlowNetwork{
   }
 
   void closeNetworkStreams(){
-    this.nout.close();
-    this.nin.close();
+    this._networkPorts.onAll((i,e){ e.close(); });
     this.errorStream.close();
     this.connectionStream.close();
     this.componentStream.close();
@@ -1193,7 +1298,7 @@ class Network extends FlowNetwork{
     this.iipStream.send({ 'type':"sendInitial", 'message': 'sending out all initials' });
   }
 
-  Future add(FlowComponent a,String id,[Function n]){
+  Future _addComponent(FlowComponent a,String id,[Function n]){
     var node = this.components.add(a);
     this.components.bind(this.placeholder,node,0);
     this.components.bind(node,this.placeholder,1);
@@ -1205,6 +1310,16 @@ class Network extends FlowNetwork{
     this.componentStream.emit(SparkFlowMessages.component('addComponent',id,a.uuid));
     return new Future.value(node);
   }
+
+  Future addComponentInstance(FlowComponent a,String id,[Function n]){
+    return this._addComponent(a,id,n);
+  }
+
+  Future add(String path,String id,[Function n,List a,Map m]){
+    if(!SparkRegistry.hasGroupString(path)) return this;
+    return this._addComponent(SparkRegistry.generateFromString(path,a,m),id,n);
+  }
+
 
   Future remove(String a,[Function n,bool bf]){
     if(!this.uuidRegister.has(a)) return;
@@ -1221,7 +1336,6 @@ class Network extends FlowNetwork{
       // this.networkStream.send({'type':'network-remove', 'error': e, 'component': a });
     });
   }
-
 
   Network connect(String a,String aport,String b, String bport,[String sockid,bool bf]){
     if(!this.uuidRegister.has(a)) return null;
@@ -1267,55 +1381,19 @@ class Network extends FlowNetwork{
     return this;
   }
 
-  Network linkErr(String com,String comport,[String sid,bool bf,bool inverse]){
-    inverse = hub.Hub.switchUnless(inverse,false);
-   this.connectionsCompiler.add((){
-      return this.filter(com,bf).then((_){
-        if(!!inverse){
-           this.connectionStream.emit(SparkFlowMessages.network('linkErr','*',com,comport,'err',sid));
-           this.nerr.bindPort(_.data.port(comport),sid);
-           return _;
-         }
-
-        _.data.port(comport).bindPort(this.nerr,sid);
-        this.connectionStream.emit(SparkFlowMessages.network('linkErr',com,'*','err',comport,sid));
-        return _;
-      });
-    });
-   return this;
-  }
-
-
-  Network linkOut(String com,String comport,[String sid,bool bf,bool inverse]){
+  Network link(String nport,String com,String inport,[String sid,bool bf,bool inverse]){
+    if(!this._networkPorts.has(nport)) return null;
     inverse = hub.Hub.switchUnless(inverse,false);
     this.connectionsCompiler.add((){
       return this.filter(com,bf).then((_){
         if(!!inverse){
-         this.connectionStream.emit(SparkFlowMessages.network('linkOut','*',com,comport,'out',sid));       
-         this.nout.bindPort(_.data.port(comport),sid); 
-         return _;
-        }
-        
-        _.data.port(comport).bindPort(this.nout,sid);
-        this.connectionStream.emit(SparkFlowMessages.network('linkOut',com,'*','out',comport,sid));
-        return _;
-      });
-    });
-   return this;
-  }
-  
-  Network linkIn(String com,String inport,[String sid,bool bf,bool inverse]){
-    inverse = hub.Hub.switchUnless(inverse,false);
-    this.connectionsCompiler.add((){
-      return this.filter(com,bf).then((_){
-        if(!!inverse){
-         this.connectionStream.emit(SparkFlowMessages.network('linkIn',com,'*','in',inport,sid));        
-          _.data.port(inport).bindPort(this.nin,sid); 
+         this.connectionStream.emit(SparkFlowMessages.network('link','*',com,inport,nport,sid));        
+          _.data.port(inport).bindPort(this.port(nport),sid); 
           return _;
         }
         
-        this.nin.bindPort(_.data.port(inport),sid);    
-        this.connectionStream.emit(SparkFlowMessages.network('linkIn',com,'*','in',inport,sid));
+        this.port(nport).bindPort(_.data.port(inport),sid);    
+        this.connectionStream.emit(SparkFlowMessages.network('link',com,'*',nport,inport,sid));
         return _;
       });
     });
@@ -1323,64 +1401,30 @@ class Network extends FlowNetwork{
     return this;
   }
 
-  Network unlinkOut(String com,String comport,[String sid,bool bf,bool inverse]){
+  Network unlink(String nport, String com,String comport,[String sid,bool bf,bool inverse]){
+    if(!this._networkPorts.has(nport)) return null;
     inverse = hub.Hub.switchUnless(inverse,false);
     this.disconnectionsCompiler.add((){
         return this.filter(com,bf).then((_){
         if(!!inverse){
-          this.connectionStream.emit(SparkFlowMessages.network('unlinkOut','*',com,comport,'out',sid));
-          this.nout.unbindPort(_.data.port(comport)); 
+          this.connectionStream.emit(SparkFlowMessages.network('unlink','*',com,comport,nport,sid));        
+          _.data.port(comport).unbindPort(this.port(nport),sid);
           return _;  
          }
 
-        _.data.port(comport).unbindPort(this.nout,sid);
-        this.connectionStream.emit(SparkFlowMessages.network('unlinkOut',com,'*','out',comport,sid));
-        return _;
-      });
-    });
-   return this;
-  }
-  
-  Network unlinkErr(String com,String comport,[String sid,bool bf,bool inverse]){
-    inverse = hub.Hub.switchUnless(inverse,false);
-   this.disconnectionsCompiler.add((){
-      return this.filter(com,bf).then((_){
-        if(!!inverse){ 
-          this.connectionStream.emit(SparkFlowMessages.network('unlinkErr','*',com,comport,'err',sid));
-          this.nerr.unbindPort(_.data.port(comport));
-          return _;
-        }
-        
-        _.data.port(comport).unbindPort(this.nerr,sid);
-        this.connectionStream.emit(SparkFlowMessages.network('unlinkErr',com,'*','err',comport,sid));
+        this.port(nport).unbindPort(_.data.port(comport)); 
+        this.connectionStream.emit(SparkFlowMessages.network('unlink',com,'*',nport,comport,sid));
         return _;
       });
     });
    return this;
   }
 
-  Network unlinkIn(String com,String inport,[String sid,bool bf,bool inverse]){
-    inverse = hub.Hub.switchUnless(inverse,false);
-    this.disconnectionsCompiler.add((){
-      return this.filter(com,bf).then((_){
-        if(!!inverse){
-         _.data.port(inport).unbindPort(this.nin,sid); 
-        this.connectionStream.emit(SparkFlowMessages.network('unlinkIn','*',com,inport,'in',sid));
-        return _;
-       }
-        else this.nin.unbindPort(_.data.port(inport));
-        this.connectionStream.emit(SparkFlowMessages.network('unlinkIn',com,'*','in',inport,sid));
-        return _;
-      });    
-    });
-
-    return this;
-  }
 
   Network loopPorts(String p,String s,[String sid]){
     var wait = (){
-      var p1 = (p == 'in' ? this.nin : (p == 'out' ? this.nout : (p == 'err' ? this.nerr : null)));
-      var p2 = (s == 'in' ? this.nin : (s == 'out' ? this.nout : (s == 'err' ? this.nerr : null)));
+      var p1 = this.port(p);
+      var p2 = this.port(s);
 
       if(hub.Valids.exists(p1) && hub.Valids.exists(p2)){
         p1.bindPort(p2,sid);
@@ -1395,8 +1439,8 @@ class Network extends FlowNetwork{
 
   Network unloopPorts(String p,String s,[String sid]){
     var wait = (){
-      var p1 = (p == 'in' ? this.nin : (p == 'out' ? this.nout : (p == 'err' ? this.nerr : null)));
-      var p2 = (s == 'in' ? this.nin : (s == 'out' ? this.nout : (s == 'err' ? this.nerr : null)));
+      var p1 = this.port(p);
+      var p2 = this.port(s);
 
       if(hub.Valids.exists(p1) && hub.Valids.exists(p2)){
         p1.unbindPort(p2,sid);
@@ -1513,6 +1557,63 @@ class Network extends FlowNetwork{
     return this.whenAlive;
   }
 
+  Map get toMeta{
+    var meta = {};
+    meta['metas'] = new Map.from(this.metas.storage);
+    meta['ports'] = {};
+    meta['id'] = this.id;
+
+    this._networkPorts.onAll((e,k){
+      meta['ports'][e] = {
+        'type': k.portClass,
+        'id': e,
+      };
+    });
+
+    return meta;
+  }
+
+  Map generateMap(Function n,Function m){
+    var meta = {};
+    n(meta);
+
+    this.graph.cascade((e){
+      var current = e.current.data;
+      if(current is FlowComponent){
+        m(meta,current);
+      }
+    });
+
+    return meta;
+  }
+
+  Map get componentsMeta{
+    return this.generateMap((meta){
+      meta['*'] = this.toMeta;
+    },(meta,comp){
+        var m = meta[comp.id] = comp.toMeta;
+        m.remove('portClass');
+        m.remove('portLists');
+        // m.remove('uuid');
+    });
+  }
+
+  Map get connectionsMeta{
+    return this.generateMap((meta){
+      meta['*'] = this.toMeta;
+      meta["*"]['connections'] =  new Map.from(this.connections.storage);
+      meta['*'].remove('metas');
+      meta['*'].remove('ports');
+    },(meta,comp){
+        var m = meta[comp.id] = comp.toMeta;
+        m['connections'] = comp.connectionsMap;
+        m.remove('portClass');
+        m.remove('portLists');
+        m.remove('ports');
+        m.remove('metas');
+    });
+  }
+
   dynamic get graph{
   	return this.components;
   }
@@ -1563,154 +1664,86 @@ class Network extends FlowNetwork{
 
   void ensureBinding(String from,String fp,String to,String tp,[String sid,bool f]){
     this.onAliveConnect((net){
-
-      hub.Funcs.when((from == to && to != "*"),(){
-
-      	  net.filter(from).then((n){
-      	  	n.data.loopPorts(tp,fp);
-        	this.connectionStream.emit(SparkFlowMessages.network('loop',from,to,fp,tp,sid));
-      	  }).catchError((e){
-        	this.connectionStream.emit(SparkFlowMessages.network('loop',from,to,fp,tp,sid,e));
-      	  });
-
-      });
-
-      hub.Funcs.when((from == "*" && to == "*"),(){
-          net.loopPorts(fp,tp);
-      });
-
-      hub.Funcs.when((from != "*" && to != "*"),(){
-        net.connect(from,fp,to,tp,sid,f);
-      });
-
-      hub.Funcs.when((from == "*" && to != '*'),(){
-        if(fp == "in") return net.linkIn(to,tp,sid,f,true);
-        if(fp == 'out') return net.linkOut(to,tp,sid,f); 
-        if(fp == 'err') return net.linkErr(to,tp,sid,f); 
-      });
-
-      hub.Funcs.when((from != "*" && to == '*'),(){
-        if(tp == "in") return net.linkIn(from,fp,sid,f);
-        if(tp == 'out') return net.linkOut(from,fp,sid,f,true); 
-        if(tp == 'err') return net.linkErr(from,fp,sid,f,true); 
-      });
-
+       return this.doBinding(from,fp,to,tp,sid,f);
     });
-
   }
 
   void ensureUnbinding(String from,String fp,String to,String tp,[String sid,bool f]){
     this.onDeadDisconnect((net){
-
- 	  hub.Funcs.when((from == to && to != "*"),(){
-
-      	  net.filter(from).then((n){
-      	  	n.data.unloopPorts(tp,fp);
-      	  	this.connectionStream.emit(SparkFlowMessages.network('unloop',from,to,fp,tp,sid));
-      	  }).catchError((e){
-        	this.connectionStream.emit(SparkFlowMessages.network('unloop',from,to,fp,tp,sid,e));
-      	  });
-      	  
-      });
-
-      hub.Funcs.when((from == "*" && to == "*"),(){
-          net.unloopPorts(fp,tp);
-      });
-
-      hub.Funcs.when((from != "*" && to != "*"),(){
-        net.disconnect(from,fp,to,tp,sid,f);
-      });
-
-      hub.Funcs.when((from == "*" && to != '*'),(){
-        if(fp == "in") return net.unlinkIn(to,tp,sid,f,true);
-        if(fp == 'out') return net.unlinkOut(to,tp,sid,f); 
-        if(fp == 'err') return net.unlinkErr(to,tp,sid,f); 
-      });
-
-      hub.Funcs.when((from != "*" && to == '*'),(){
-        if(tp == "in") return net.unlinkIn(from,fp,sid,f);
-        if(tp == 'out') return net.unlinkOut(from,fp,sid,f,true); 
-        if(tp == 'err') return net.unlinkErr(from,fp,sid,f,true); 
-      });
-
+       return this.doUnBinding(from,fp,to,tp,sid,f);
     });
   }
 
   void looseBinding(String from,String fp,String to,String tp,[String sid,bool f]){
-
- 	  hub.Funcs.when((from == to && to != "*"),(){
-
-      	  net.filter(from).then((n){
-      	  	n.data.loopPorts(tp,fp);
-      	  	this.connectionStream.emit(SparkFlowMessages.network('loop',from,to,fp,tp,sid));
-      	  }).catchError((e){
-        	this.connectionStream.emit(SparkFlowMessages.network('loop',from,to,fp,tp,sid,e));
-      	  });
-
-      });
-
-      hub.Funcs.when((from == "*" && to == "*"),(){
-          this.loopPorts(fp,tp);
-      });
-
-      hub.Funcs.when((from != "*" && to != "*"),(){
-          this.connect(from,fp,to,tp,sid,f);
-      });
-
-      hub.Funcs.when((from == "*" && to != '*'),(){
-        if(fp == "in") return this.linkIn(to,tp,sid,f,true);
-        if(fp == 'out') return this.linkOut(to,tp,sid,f); 
-        if(fp == 'err') return this.linkErr(to,tp,sid,f); 
-      });
-
-      hub.Funcs.when((from != "*" && to == '*'),(){
-        if(tp == "in") return this.linkIn(from,fp,sid,f);
-        if(tp == 'out') return this.linkOut(from,fp,sid,f,true); 
-        if(tp == 'err') return this.linkErr(from,fp,sid,f,true); 
-      });
-
+     return this.doBinding(from,fp,to,tp,sid,f);
   }
 
   void looseUnbinding(String from,String fp,String to,String tp,[String sid,bool f]){
+     return this.doUnBinding(from,fp,to,tp,sid,f);
+  }
 
- 	  hub.Funcs.when((from == to && to != "*"),(){
+  void doBinding(String from,String fp,String to,String tp,[String sid,bool f]){
+      
+      hub.Funcs.when((from == to && to != "*"),(){
 
-      	  net.filter(from).then((n){
-      	  	n.data.unloopPorts(tp,fp);
-        	this.connectionStream.emit(SparkFlowMessages.network('unloop',from,to,fp,tp,sid));
-      	  }).catchError((e){
-        	this.connectionStream.emit(SparkFlowMessages.network('unloop',from,to,fp,tp,sid,e));
-      	  });
-      	  
+          this.filter(from).then((n){
+            n.data.loopPorts(tp,fp);
+            this.connectionStream.emit(SparkFlowMessages.network('loop',from,to,fp,tp,sid));
+          }).catchError((e){
+            this.connectionStream.emit(SparkFlowMessages.network('loop',from,to,fp,tp,sid,e));
+          });
+
       });
 
       hub.Funcs.when((from == "*" && to == "*"),(){
-            this.unloopPorts(fp,tp);
+          return this.loopPorts(fp,tp);
       });
 
       hub.Funcs.when((from != "*" && to != "*"),(){
-           this.disconnect(from,fp,to,tp,sid,f);
+          return this.connect(from,fp,to,tp,sid,f);
       });
 
       hub.Funcs.when((from == "*" && to != '*'),(){
-        if(fp == "in") return this.unlinkIn(to,tp,sid,f,true);
-        if(fp == 'out') return this.unlinkOut(to,tp,sid,f); 
-        if(fp == 'err') return this.unlinkErr(to,tp,sid,f); 
+        return this.link(fp,to,tp,sid,f,true);
       });
 
       hub.Funcs.when((from != "*" && to == '*'),(){
-        if(tp == "in") return this.unlinkIn(from,fp,sid,f);
-        if(tp == 'out') return this.unlinkOut(from,fp,sid,f,true); 
-        if(tp == 'err') return this.unlinkErr(from,fp,sid,f,true); 
+        return this.link(tp,from,fp,sid,f); 
       });
 
   }
 
-  dynamic port(String p){
-  	if(hub.Valids.iS(p,'in')) return this.nin;
-  	if(hub.Valids.iS(p,'out')) return this.nout;
-  	if(hub.Valids.iS(p,'err')) return this.nerr;
+  void doUnBinding(String from,String fp,String to,String tp,[String sid,bool f]){
+
+      hub.Funcs.when((from == to && to != "*"),(){
+
+          this.filter(from).then((n){
+            n.data.unloopPorts(tp,fp);
+            this.connectionStream.emit(SparkFlowMessages.network('unloop',from,to,fp,tp,sid));
+          }).catchError((e){
+            this.connectionStream.emit(SparkFlowMessages.network('unloop',from,to,fp,tp,sid,e));
+          });
+          
+      });
+
+      hub.Funcs.when((from == "*" && to == "*"),(){
+          return this.unloopPorts(fp,tp);
+      });
+
+      hub.Funcs.when((from != "*" && to != "*"),(){
+        return this.disconnect(from,fp,to,tp,sid,f);
+      });
+
+      hub.Funcs.when((from == "*" && to != '*'),(){
+        return this.unlink(fp,to,tp,sid,f,true);
+      });
+
+      hub.Funcs.when((from != "*" && to == '*'),(){
+        return this.unlink(tp,from,fp,sid,f);
+      });
+
   }
+
 
 }
 
@@ -1720,13 +1753,20 @@ class ConnectionMeta extends hub.MapDecorator{
     static create(n) => new ConnectionMeta(n);
     ConnectionMeta(this.handler): super();
 
-    dynamic filterPortLevel(hub.MapDecorator ports,String uuid,String port,[String sockid]){
-      if(!ports.has(uuid)) return null;
-
-      return hub.Enums.filterValues(ports.storage,(e,i,o){
-        print(e,i,o);
+    dynamic filterUUIDPort(List a,String port,[String sockid]){
+      return hub.Enums.filterKeys(a,(e,i,o){
+        if(e['port'] == port){
+          if((sockid != null && e['socketId']) != null && sockid != e['socketId']) return false;
+          return true;
+        }
+        return false;
       });
 
+    }
+
+    dynamic filterPortLevel(hub.MapDecorator ports,String uuid,String port,[String sockid]){
+      if(!ports.has(uuid)) return null;
+      return this.filterUUIDPort(ports.get(uuid),port,sockid);
     }
 
     void addConnection(String ports,String uuid,String port,[String sockid]){
@@ -1734,12 +1774,25 @@ class ConnectionMeta extends hub.MapDecorator{
       var cport = this.get(ports);
       if(!cport.has(uuid)) cport.add(uuid,[]);
       var uuidp = cport.get(uuid);
-      uuidp.add({ 'port':port, 'socketId':sockid});
-      return null;
+      var has = this.filterUUIDPort(uuidp,port,sockid);
+      hub.Funcs.when(has.length == 0,(){
+        uuidp.add({ 'port':port, 'socketId':sockid});
+      });
     } 
 
-    void removeConnection(String ports,String uuid,String port,String sockid){
-    	
+    void removeConnection(String ports,String uuid,String port,[String sockid]){
+    	if(!this.has(ports)) return;
+      
+      var core = this.get(ports);
+      if(!core.has(uuid)) return;
+
+      var item = this.filterPortLevel(core,uuid,port,sockid);
+      var uuidp = core.get(uuid);
+      hub.Funcs.when(hub.Valids.exists(uuidp),(){
+        item.forEach((n){ uuidp.removeAt(n); });
+        if(uuidp.length == 0) core.destroy(uuid);
+      });
+      
     }
 }
 
@@ -1766,7 +1819,7 @@ class Component extends FlowComponent{
     
     proto.metas.storage.addAll(payload.get('metas'));
     
-    // proto.setGroup(payload.get('metas')['group']);
+    proto.setGroup(payload.get('metas')['group']);
 
     if(proto.portClass.length != payload.get('portClass').length){
         proto.portClass.clear();
@@ -1813,9 +1866,13 @@ class Component extends FlowComponent{
 
   }
   
+  Map get connectionsMap{
+    return new Map.from(this.connections.storage);
+  }
+
   Future boot(){
     this.ports.onAll((k,n){
-       n.connect();
+       n.resume();
     });
     this.stateStream.emit({'type':'component-boot','id': this.id,'uuid':this.metas.get('uuid')});
     return this.network.boot();
@@ -1823,7 +1880,7 @@ class Component extends FlowComponent{
 
   Future freeze(){
     this.ports.onAll((k,n){
-       n.disconnect();
+       n.pause();
     });   
     this.stateStream.emit({'type':'component-freeze','id': this.id,'uuid':this.metas.get('uuid')});
     return this.network.freeze();

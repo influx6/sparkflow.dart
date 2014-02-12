@@ -1,6 +1,7 @@
 library sparkflow;
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:hub/hub.dart' as hub;
 import 'package:streamable/streamable.dart';
 import 'package:ds/ds.dart' as ds;
@@ -166,8 +167,7 @@ class SparkFlow extends FlowAbstract{
   }
 
   dynamic use(String paths,String alias,[List a,Map m,Function n]){
-    if(!SparkRegistry.hasGroupString(paths)) return this;
-    return this.network.add(SparkRegistry.generateFromString(paths,a,m),alias,n);
+    return this.network.add(paths,alias,n,a,m);
   }
 
   Future unUse(String alias,[Function n]){

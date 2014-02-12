@@ -63,7 +63,6 @@ void main(){
 	UnModifiers.registerComponents();
 	Transformers.registerComponents();
   
-	print(SparkRegistry.groups);
 	var sf = SparkFlow.create("example.basic", "standard sf object to use");
   	
   	//SparkFlow.use: Arguements
@@ -92,7 +91,7 @@ void main(){
 	//cosmo out will feed repeaters in
 	sf.ensureBinding('repeater','in','cosmo','out');
 	//cosmo in will feed cosmo out
-  sf.ensureBinding('cosmo','out','cosmo','in');
+    sf.ensureBinding('cosmo','out','cosmo','in');
 	//network(*) in will feed cosmo's in
 	sf.ensureBinding('cosmo','in','*','in');
 	//cosmo out will feed network out
@@ -100,11 +99,11 @@ void main(){
 
 
 	sf.network.connectionStream.on((e){
-//	  print('connection#${e}');
+	  // print('connection#${e}');
 	}); 
 
 	sf.onAlive((net){
-		print('booting connections!');
+//		print('booting connections!');
 	});
 
 	sf.onDead((net){

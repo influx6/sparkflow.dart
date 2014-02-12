@@ -2,6 +2,7 @@ library flow.specs;
 
 import 'package:sparkflow/sparkflow.dart';
 import 'package:sparkflow/components/transformers.dart';
+import 'package:sparkflow/components/unmodifiers.dart';
 
 void main(){
   
@@ -22,7 +23,7 @@ void main(){
   	//print('internal initial socket: ${meta.toString().split(',').join('\n')}');
 
   	//attach the IIP to the component's option port
-  	meta.socket.attachPort(meta.component.port('option'));
+  	//meta.socket.attachPort(meta.component.port('option'));
   });
 
   network.add(cosmo,'cosmo',(meta){

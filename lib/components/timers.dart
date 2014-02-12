@@ -9,18 +9,20 @@ import 'package:sparkflow/sparkflow.dart';
 class Timers{
   
   static void registerComponents(){
-    SparkRegistry.register("transformers", 'StringPrefixer', StringPrefixer.create);
+    SparkRegistry.register("Timers", 'RunTimeOut', RunTimeOut.create);
+    SparkRegistry.register("Timers", 'RunInterval', RunInterval.create);
   }
   
 }
 
 class RunTimeOut extends Component{
 	Timer handler;
-	
+	int timeout;
+
 	static create() => new RunTimeOut();
 
 	RunTimeOut(){
-		this.meta('desc','sends the ip it receives at a timeout set by a number it gets from its option port');
+		this.meta('desc','sends ip off at a specified time in ms!');
 		this.init();
 	}
 
@@ -33,6 +35,44 @@ class RunTimeOut extends Component{
 
 		hop.tap((n){
 			if(!Valids.isNumber(n)) return herr.send(new Exception('$n is not a type of number!'));
+			this.createTimer(n);
+		});
+
+		hin.dataDrained.on((n){ hin.disconnect(); });
+		
+		hop.dataDrained.once((n){
+			hin.bindPort(hout);
+			hin.pause();
+		});
+
+
+	}
+
+	void createTimer(int n){
+		if(Valids.exists(this.handler)) this.handler.cancel();
+		this.timeout = n;
+		this.handler = new Timer(new Duration(milliseconds: this.timeout),(){
+			this.port('in').connect();
+		});
+	}
+
+}
+
+
+class RunInterval extends RunTimeOut{
+
+	static create() => new RunInterval();
+
+	RunInterval() : super(){
+		this.meta('desc','delivers an ip every interval');
+	}
+
+	void createTimer(int n){
+		if(Valids.exists(this.handler)) this.handler.cancel();
+		this.timeout = n;
+		new Timer.periodic(new Duration(milliseconds: this.timeout),(timer){
+			this.handler = timer;
+			this.port('in').connect();
 		});
 	}
 }
