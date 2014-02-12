@@ -94,6 +94,50 @@
 
     feeder2.send('4');
 
+  Network: Its the core of all fbp application,managing the connections of ports and component instances registered to it and internally provides the subgraph functionality for all components, an example is as below, but please not that instead of adding instances directly,its preferable to register
+  a function that generates the instance with SparkRegistry.
+
+    Example from /test/network.dart
+    
+      library flow.specs;
+
+      import 'package:sparkflow/sparkflow.dart';
+
+      void main(){
+        
+        var network = Network.create('example');
+
+        network.networkStream.pause();
+        
+        var loop = Component.create('loop');
+        loop.renamePort('in','suck');
+        loop.renamePort('out','spill');
+        loop.loopPorts('suck','spill');
+        
+        var costa = Component.create('costa');
+
+        var cosmo = Component.create('cosmo');
+
+        network.addComponentInstance(loop,'loopback');
+        network.addComponentInstance(costa,'costa');
+        network.addComponentInstance(cosmo,'cosmo');
+        
+        network.filter('cosmo').then((_){
+          assert(_.data.UID == cosmo.UID);
+        });
+        
+        //order goes component who wants to connect to component port with port
+        network.connect('costa','loopback','in','out');
+
+        network.freeze();
+        //listen to info streams for update
+        network.networkStream.on((n){
+          print('#Updates: \n $n \n');
+        });
+
+        network.boot();
+      }
+
 
   SparkFlow: the top level object in Sparkflow, covers up alot of the nitty gritty and over-verbose calls for network and component configuration,it also
   ensures and enforces the use of SparkRegistry as a global component pool which allows proper grouping and generation of component instances and genrealy serves for smooth operation,an example is as below:
