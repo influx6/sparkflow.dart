@@ -38,7 +38,7 @@
   at creation has4 predefined ports (in,out,option and err),where each provides a stream input for the 
   component
   
-    repeaters take and give what they recieve
+    repeaters take and give what they receive
     var repeater = Repeater.create();
 
     prefixer takes an input and prefix a value it receives from its option stream to the input value
@@ -70,9 +70,9 @@
     
     In FBP,there is a notion of substreams,which can be anchored by specific tags
     here the feeder is pushing a substream of article tag: 
-     <article>1: road</article>
-    begins the substream
+     <article>1: road </article>
 
+    begins the substream
     feeder.beginGroup('<article>');
 
     data in the substream,can be called countless times to add data into the grouping
