@@ -35,12 +35,12 @@ class ConstValue extends Component{
 	ConstValue(){
 		this.meta('desc','takes a constant value from its option ports and always returns that value');
 		
-		this.port('option').tab((n){
+		this.port('option').tab('data',(n){
 		  this.setValue(n);
 		});
     
 		this.port('option').dataDrained.once((i){
-		  	this.port('in').tap((k){
+		  	this.port('in').tap('data',(k){
         		this.port('out').send(this._value);
       		});  
 		});

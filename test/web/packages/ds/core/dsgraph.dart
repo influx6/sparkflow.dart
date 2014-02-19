@@ -289,7 +289,9 @@ class dsGraph<T,M> extends dsAbstractGraph<T,M>{
       map.write('>');
       return map.toString();
     }
-
+    
+    void flush() => this.nodes.free();
+    
     dsGraphNode get first => this.nodes.root.data;
     dsGraphNode get last => this.nodes.tail.data;
     bool get isEmpty => this.nodes.isEmpty;

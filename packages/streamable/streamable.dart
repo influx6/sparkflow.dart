@@ -443,11 +443,16 @@ class Streamable<T> extends Streamer<T>{
     return this.listeners.hasListeners;
   }
   
-  Subscriber subscribe(Function fn){
+  Subscriber subscribe([Function fn]){
     var sub = Subscriber.create(this);
-    sub.on(fn);
+    if(fn != null) sub.on(fn);
     return sub;
   }
+
+  void forceFlush(){
+    this.streams.clear();
+  }
+
 }
 
 class Subscriber<T> extends Listener<T>{
@@ -624,6 +629,16 @@ class GroupedStream{
   dynamic get beginGroupResumed => this.begin.resumer;
   dynamic get streamResumed => this.stream.resumer;
 
+  dynamic get dataSegmentBegin => this.data.beginSegment;
+  dynamic get endGroupSegmentBegin => this.end.beginSegment;
+  dynamic get beginGroupSegmentBegin => this.begin.beginSegment;
+  dynamic get streamSegmentBegin => this.stream.beginSegment;
+
+  dynamic get dataSegmentEnd => this.data.endSegment;
+  dynamic get endGroupSegmentEnd => this.end.endSegment;
+  dynamic get beginGroupSgmentEnd => this.begin.endSegment;
+  dynamic get streamSegmentEnd => this.stream.endSegment;
+  
   void whenDrained(Function n){
     this.stream.whenDrained(n);  
   }
@@ -687,6 +702,7 @@ class GroupedStream{
   }
   
   bool get hasConnections => this.stream.hasListeners;
+  
 }
 
 

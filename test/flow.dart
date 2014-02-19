@@ -10,7 +10,7 @@ void main(){
 
 	fromPort.bindPort(toPort);
 
-	toPort.tap((n){
+	toPort.tap('data',(n){
 	   print('#toPort recieves: $n');
 	});
 

@@ -1,7 +1,6 @@
 library sparkflow;
 
 import 'dart:async';
-import 'dart:convert';
 import 'package:hub/hub.dart' as hub;
 import 'package:streamable/streamable.dart';
 import 'package:ds/ds.dart' as ds;

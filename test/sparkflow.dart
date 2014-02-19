@@ -74,16 +74,16 @@ void main(){
   	// note: now all components automatically get their options port attached to the IIPSocket(no-overrides)
   	
 	sf..use('transformers/StringPrefixer','stringer',null,null,(m){
-      m.port('in').tap((n){ print('stringer-in:$n');});
-      m.port('out').tap((n){ print('stringer-out:$n');});
+      m.port('in').tap('data',(n){ print('stringer-in:$n');});
+      m.port('out').tap('data',(n){ print('stringer-out:$n');});
   })
 	..use('components/component','cosmo',null,null,(m){
-      m.port('in').tap((n){ print('cosmo-in:$n');});
-      m.port('out').tap((n){ print('cosmo-out:$n');});
+      m.port('in').tap('data',(n){ print('cosmo-in:$n');});
+      m.port('out').tap('data',(n){ print('cosmo-out:$n');});
 	})
 	..use('unModifiers/Repeater','repeater',null,null,(m){
-      m.port('in').tap((n){ print('repeater-in:$n');});
-      m.port('out').tap((n){ print('repeater-out:$n');});
+      m.port('in').tap('data',(n){ print('repeater-in:$n');});
+      m.port('out').tap('data',(n){ print('repeater-out:$n');});
   });
   
 	//repeaters-out will feed stringers in
@@ -112,7 +112,7 @@ void main(){
 
 	sf.boot().then((_){
 	   	  
-		_.port('out').tap((n){
+		_.port('out').tap('data',(n){
 			  print('network spouting: $n');
 		});
 

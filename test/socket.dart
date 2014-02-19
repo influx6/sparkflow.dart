@@ -9,7 +9,7 @@ void main(){
  
   toPort.bindSocket(fromPort);
 
-  fromPort.on((n){
+  fromPort.on('data',(n){
     print('#fromPort recieves: $n');
   });
   

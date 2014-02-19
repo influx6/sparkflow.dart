@@ -53,7 +53,7 @@ void main(){
 	  network.nin.bindPort(cosmo.port('in'));
 	  // tap into networks out port 'nout' to see what comes out
 
-	  network.nout.tap((n){
+	  network.nout.tap('data',(n){
 	  	print('network spouting: $n');
 	  });
 

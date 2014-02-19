@@ -79,6 +79,8 @@ abstract class dsFilter{
 }
 
 abstract class dsAbstractNode<T> implements Comparable{
+	dsAbstractNode<T> left;
+	dsAbstractNode<T> right;
 	T data;
 	bool _mark = false;
 	
@@ -117,9 +119,9 @@ abstract class dsAbstractList<T> extends DS implements Comparable{
 	}
 	
 	void nullify(){
-    this.head = this.tail = null;
-    this.bomb.detonate();
-  }
+                this.head = this.tail = null;
+                this.bomb.detonate();
+        }
 	
 	bool isDense(){
 	    if(this.maxSize == null) return false;

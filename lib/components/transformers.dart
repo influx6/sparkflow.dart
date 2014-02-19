@@ -63,7 +63,7 @@ class Prefixer extends Component{
     var m = this.port('option');
     var buffer = this.port('internalBuffer');
 
-    m.tap((h){
+    m.tap('data',(h){
       this._combinator.change(h);
     });
     

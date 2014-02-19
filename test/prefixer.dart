@@ -6,7 +6,7 @@ void main(){
   
   var prefixer = StringPrefixer.create();
   
-  prefixer.port('out').tap((n){
+  prefixer.port('out').tap('data',(n){
     print('prexifing: $n');
   });
   

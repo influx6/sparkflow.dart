@@ -32,6 +32,12 @@ class Funcs{
     };
   }
   
+  static Function matchConditions(dynamic n){
+    if( n is List) return Funcs.matchListConditions(n);
+    return Funcs.matchMapConditions(n);
+  }
+  
+  
   static Function createMessageMatcher(String name,String failmessage,dynamic n,[int i]){
     return Funcs.compose((bool m){ 
       if(!!m) return true;
@@ -43,7 +49,7 @@ class Funcs{
     },n,i);
   }
   
-  //returns a future with a map 
+  //returns a future with a map of error messages if any
   static Function captureMapConditions([Map<String,Function> sets]){
     return (r){
       var errors = {}, future  = new Completer<Map>();
@@ -68,6 +74,11 @@ class Funcs{
       });
       return future.future;
     };
+  }
+  
+  static Funcstion captureConditions(dynamic n){
+     if(n is List) return Funcs.captureListCondition(n);
+     return Funcs.captureMapConditions(n);
   }
   
   //produces a function that accepts 1 mandatory and an (m-1) option parameters
@@ -211,7 +222,7 @@ class Funcs{
   static dynamic then(Function m,Function n,[Function f,int s]){
     return Funcs.compose((state){
       if(Valids.isTrue(state)) return n(state);
-      if(Valids.exists(f) && Valids.isFalse(state)) return f(state);
+      if(Valids.exist(f) && Valids.isFalse(state)) return f(state);
       return null; 
     },m,s);
   }  
@@ -225,6 +236,19 @@ class Funcs{
     return (){
       return n;
     };
+  }
+  
+  static Function applyUnless(Function m){
+   return (g){
+       return (m(g) || g);
+   };
+  }
+  static Function defaultUnlessApply(Function m){
+     return (d){
+        return (g){
+           return (m(g) || d);
+        };
+     };
   }
   
 }

@@ -63,6 +63,10 @@ class State{
     return this.states.destroy(n);
   }
 
+  vid close(){
+     this.states.flush();
+  }
+  
   bool get activated => !!this._active;
   bool get deactivated => !this._active;
   
@@ -77,6 +81,11 @@ class StateManager{
     
     StateManager(this.target){
       this.store = Hub.createMapDecorator();
+    }
+    
+    void close(){
+     this.store.onAll((e,k){ k.close(); });
+     this.store.flush();
     }
     
     void add(String name,dynamic m){
@@ -530,10 +539,10 @@ class MapDecorator{
 		return true;
 	}
 	
-  bool hasValue(String v){
-    if(!this.storage.containsValue(v)) return false;
-    return true;
-  }
+        bool hasValue(String v){
+                if(!this.storage.containsValue(v)) return false;
+                return true;
+        }
 
 	void onAll(Function n) => this.storage.forEach(n);
 	

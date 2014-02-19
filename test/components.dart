@@ -2,6 +2,7 @@ library flow.specs;
 
 import 'package:sparkflow/sparkflow.dart';
 import 'package:sparkflow/components/transformers.dart';
+import 'package:sparkflow/components/unmodifiers.dart';
 
 void main(){
   
@@ -15,7 +16,7 @@ void main(){
   var reader  = Port.create('writer');
   var feeder2  = Port.create('feeder');
   
-  reader.tap((n){ print('#log  => $n'); });
+  reader.tap('data',(n){ print('#log  => $n'); });
   
   feeder.bindPort(repeater.port('suck'));
   repeater.port('spill').bindPort(reader);
