@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:hub/hub.dart' as hub;
 import 'package:streamable/streamable.dart';
 import 'package:ds/ds.dart' as ds;
+import 'package:groupobject/groupobject.dart';
 
 part 'flow.dart';
 part 'groups.dart';
@@ -59,8 +60,67 @@ part 'protocol.dart';
       add the necessary components to the SparkRegistery,unforunately there is no easy way
       to automatically run this once a library is imported;
   */ 
+ 
+class Packet extends GroupObject{
+
+  static create(g) => new IPSignature(g);
+
+  Packet(g): super(g);
   
+  void init(event,data,owner,portid){
+    this.event = event;
+    this.data = data;
+    this.owner = owner;
+    this.port = portid;
+  }
+
+  dynamic get event => this.get('event');
+  dynamic get data => this.get('data');
+  dynamic get owner => this.get('owner');
+  dynamic get port => this.get('port');
+  /*dynamic get socket => this.get('socket');*/
+  
+  /*void set socket(FlowSocket d){*/
+  /*  this.update('socket',d);*/
+  /*}*/
+
+  void set port(String d){
+    this.update('port',d);
+  }
+
+  void set event(String d){
+    this.update('event',d);
+  }
+
+  void set data(dynamic d){
+    if(this.has('data')) return this.update('data',d);
+    this.add('data',d);
+  }
+
+  void set owner(String d){
+    return this.update('owner',d);
+  } 
+  
+  String toString(){
+    var buffer = new StringBuffer();
+    buffer.write('Packet:\n');
+    buffer.write('\t event: ${this.event}\n');
+    buffer.write('\t owner: ${this.owner}\n');
+    buffer.write('\t data: ${this.data}\n');
+    buffer.write('\t port: ${this.port}\n');
+    return buffer.toString();
+  }
+}
+
+
 class SparkRegistry{
+
+  static Groups packets = Groups.create((g,d,w,r){
+    var ip = Packet.create(g);
+    ip.init(d,w,r);
+    return ip;
+  });
+
   static SparkGroups groups = SparkGroups.create();
 
   static void addGroup(String handle){
@@ -114,6 +174,10 @@ class SparkRegistry{
     return SparkRegistry.groups.generateFromString(path,ops,a);
   }
 
+  //transformers/StringPrefixer,[id,name],{id:name}
+  static dynamic generate(String path,[List ops,Map a]){
+    return SparkRegistry.generateFromString(path,ops,a);
+  }
 }
 
 

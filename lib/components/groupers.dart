@@ -7,7 +7,7 @@ import 'package:sparkflow/sparkflow.dart';
 class Groupers{
   
   static void registerComponents(){
-    SparkRegistry.register("transfomers", 'GroupPackets', GroupPackets.create);
+    SparkRegistry.register("Groups", 'GroupPackets', GroupPackets.create);
   }
   
 }

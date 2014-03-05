@@ -2,8 +2,7 @@ library sparkflow.protocol;
 
 
 import 'package:sparkflow/sparkflow.dart';
-import 'package:sparkflow/components/unmodifiers.dart';
-import 'package:sparkflow/components/transformers.dart';
+import 'package:sparkflow/components/components.dart';
 
 void main(){
   
@@ -60,8 +59,6 @@ void main(){
 	*/ 
 
 	Component.registerComponents();
-	UnModifiers.registerComponents();
-	Transformers.registerComponents();
   
 	var sf = SparkFlow.create("example.basic", "standard sf object to use");
   	
@@ -73,18 +70,12 @@ void main(){
   	// 5. Function for extra duties
   	// note: now all components automatically get their options port attached to the IIPSocket(no-overrides)
   	
-	sf..use('transformers/StringPrefixer','stringer',null,null,(m){
-      m.port('in').tap('data',(n){ print('stringer-in:$n');});
-      m.port('out').tap('data',(n){ print('stringer-out:$n');});
-  })
+	sf..use('transformers/StringPrefixer','stringer')
 	..use('components/component','cosmo',null,null,(m){
       m.port('in').tap('data',(n){ print('cosmo-in:$n');});
       m.port('out').tap('data',(n){ print('cosmo-out:$n');});
 	})
-	..use('unModifiers/Repeater','repeater',null,null,(m){
-      m.port('in').tap('data',(n){ print('repeater-in:$n');});
-      m.port('out').tap('data',(n){ print('repeater-out:$n');});
-  });
+	..use('unModifiers/Repeater','repeater');
   
 	//repeaters-out will feed stringers in
 	sf.ensureBinding('stringer','in','repeater','out');

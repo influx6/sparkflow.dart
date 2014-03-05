@@ -9,13 +9,10 @@ void main(){
  
   toPort.bindSocket(fromPort);
 
-  fromPort.on('data',(n){
+  fromPort.on((n){
     print('#fromPort recieves: $n');
   });
   
-  toPort.setDelimiter('|');
-  toPort.enableDelimiter();
-
   toPort.send('think');
   toPort.send('straight');
   toPort.send('my');

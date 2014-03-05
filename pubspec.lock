@@ -9,6 +9,10 @@ packages:
     description: ds
     source: hosted
     version: "0.4.0"
+  groupobject:
+    description: groupobject
+    source: hosted
+    version: "0.0.1"
   guardedfs:
     description: guardedfs
     source: hosted
@@ -16,7 +20,7 @@ packages:
   hub:
     description: hub
     source: hosted
-    version: "0.6.8"
+    version: "0.7.1"
   path:
     description: path
     source: hosted
@@ -24,4 +28,4 @@ packages:
   streamable:
     description: streamable
     source: hosted
-    version: "0.1.5"
+    version: "0.2.0"
