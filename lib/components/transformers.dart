@@ -85,8 +85,9 @@ class StringPrefixer extends Prefixer{
   static create() => new StringPrefixer();
 
   StringPrefixer() : super((n,k){ 
-    return n.data + k.data;
-  
+    var pre = n.data + k.data;
+    k.free();
+    return pre;
   },"StringPrefixer");
   
 }

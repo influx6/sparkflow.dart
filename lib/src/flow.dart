@@ -1104,7 +1104,7 @@ class Network extends FlowNetwork{
   }
 
   Future add(String path,String id,[Function n,List a,Map m]){
-    if(!SparkRegistry.hasGroupString(path)) return new Future.error(new Exception('Component not found!'));
+    if(!SparkRegistry.hasGroupString(path)) return new Future.error(new Exception('Component $path not found!'));
     return this._addComponent(SparkRegistry.generateFromString(path,a,m),id,n);
   }
 
@@ -1576,7 +1576,9 @@ class ConnectionMeta extends hub.MapDecorator{
 
 class PortGroup{
   final defaults = {
-    'schema':'dynamic'
+    'schema':'dynamic',
+    'datatype':'dynamic',
+    'engine':'sparkflow',
   };
   final Streamable events = Streamable.create();
   final portLists = new hub.MapDecorator();
@@ -1876,6 +1878,10 @@ class Component extends FlowComponent{
 
     });
 
+  }
+  
+  bool hasPort(String g){
+    return this.comPorts.has(g);
   }
 
   void createSpace(String g){

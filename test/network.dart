@@ -9,9 +9,7 @@ void main(){
   network.networkStream.pause();
   
   var loop = Component.create('loop');
-  loop.renamePort('in','suck');
-  loop.renamePort('out','spill');
-  loop.loopPorts('suck','spill');
+  loop.loopPorts('inports:in','outports:out');
   
   var costa = Component.create('costa');
 
@@ -26,12 +24,28 @@ void main(){
   });
   
   //order goes component who wants to connect to component port with port
-  network.connect('costa','loopback','in','out');
+  network.connect('costa','loopback','inports:in','outports:out');
 
   network.freeze();
   //listen to info streams for update
   network.networkStream.on((n){
     print('#Updates: \n $n \n');
+  });
+
+  network.connectionStream.on((n){
+    print('#Connections: \n $n \n');
+  });
+
+  network.iipStream.on((n){
+    print('#iipStreams: \n $n \n');
+  });
+
+  network.errorStream.on((n){
+    print('#errorStream: \n $n \n');
+  });
+
+  network.componentStream.on((n){
+    print('#componentStream: \n $n \n');
   });
 
   network.boot();

@@ -58,7 +58,7 @@ void main(){
 	  	to automatically run this once a library is imported;
 	*/ 
 
-	Component.registerComponents();
+	Components.registerComponents();
   
 	var sf = SparkFlow.create("example.basic", "standard sf object to use");
   	
@@ -72,29 +72,29 @@ void main(){
   	
 	sf..use('transformers/StringPrefixer','stringer')
 	..use('components/component','cosmo',null,null,(m){
-      m.port('in').tap('data',(n){ print('cosmo-in:$n');});
-      m.port('out').tap('data',(n){ print('cosmo-out:$n');});
+      m.port('inports:in').tap((n){ print('cosmo-in:$n');});
+      m.port('outports:out').tap((n){ print('cosmo-out:$n');});
 	})
 	..use('unModifiers/Repeater','repeater');
   
 	//repeaters-out will feed stringers in
-	sf.ensureBinding('stringer','in','repeater','out');
+	sf.ensureBinding('stringer','inports:in','repeater','outports:out');
 	//cosmo out will feed repeaters in
-	sf.ensureBinding('repeater','in','cosmo','out');
+	sf.ensureBinding('repeater','inports:in','cosmo','outports:out');
 	//cosmo in will feed cosmo out
-    sf.ensureBinding('cosmo','out','cosmo','in');
+    sf.ensureBinding('cosmo','outports:out','cosmo','inports:in');
 	//network(*) in will feed cosmo's in
-	sf.ensureBinding('cosmo','in','*','in');
+	sf.ensureBinding('cosmo','inports:in','*','inports:in');
 	//cosmo out will feed network out
-	sf.ensureBinding('*','out','stringer','out');
+	sf.ensureBinding('*','outports:out','stringer','outports:out');
 
 
 	sf.network.connectionStream.on((e){
-	  // print('connection#${e}');
+	   print('connection#${e}');
 	}); 
 
 	sf.onAlive((net){
-//		print('booting connections!');
+		print('booting connections!');
 	});
 
 	sf.onDead((net){
@@ -103,13 +103,13 @@ void main(){
 
 	sf.boot().then((_){
 	   	  
-		_.port('out').tap('data',(n){
+		_.port('outports:out').tap((n){
 			  print('network spouting: $n');
 		});
 
 		_.addInitial('stringer','network::');
 
-		_.port('in').send('sanction'); 
+		_.port('inports:in').send('sanction'); 
 
 	});
 	
