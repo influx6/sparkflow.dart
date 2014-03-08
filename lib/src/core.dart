@@ -4,7 +4,6 @@ import 'dart:async';
 import 'package:hub/hub.dart' as hub;
 import 'package:streamable/streamable.dart';
 import 'package:ds/ds.dart' as ds;
-import 'package:groupobject/groupobject.dart';
 
 part 'flow.dart';
 part 'groups.dart';

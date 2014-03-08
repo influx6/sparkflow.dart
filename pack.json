@@ -10,11 +10,6 @@
  	 "install_dir":"./packages", 
  	 	 
  	 "depends":{ 
-		  "groupobject":{ 
-			  "type":"groupobject", 
-			 "url":"../groupobject"
-		 }, 
-			 
 		 "ds":{ 
 			  "type":"dartpath", 
 			 "url":"../ds"
