@@ -28,9 +28,9 @@ class RunTimeOut extends Component{
 
 	void init(){
 
-		var hin = this.port('inports:in'),
-			hout = this.port('outports:out'),
-			herr = this.port('errports:err'),
+		var hin = this.port('in:in'),
+			hout = this.port('out:out'),
+			herr = this.port('err:err'),
 			hop = this.port('static:option');
 
 		hop.tap((n){
@@ -52,7 +52,7 @@ class RunTimeOut extends Component{
 		if(Valids.exists(this.handler)) this.handler.cancel();
 		this.timeout = n;
 		this.handler = new Timer(new Duration(milliseconds: this.timeout),(){
-			this.port('inports:in').connect();
+			this.port('in:in').connect();
 		});
 	}
 
@@ -72,7 +72,7 @@ class RunInterval extends RunTimeOut{
 		this.timeout = n;
 		new Timer.periodic(new Duration(milliseconds: this.timeout),(timer){
 			this.handler = timer;
-			this.port('inports:in').connect();
+			this.port('in:in').connect();
 		});
 	}
 }

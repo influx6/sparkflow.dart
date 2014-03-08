@@ -9,7 +9,7 @@ void main(){
   network.networkStream.pause();
   
   var loop = Component.create('loop');
-  loop.loopPorts('inports:in','outports:out');
+  loop.loopPorts('in:in','out:out');
   
   var costa = Component.create('costa');
 
@@ -24,7 +24,7 @@ void main(){
   });
   
   //order goes component who wants to connect to component port with port
-  network.connect('costa','loopback','inports:in','outports:out');
+  network.connect('costa','loopback','in:in','out:out');
 
   network.freeze();
   //listen to info streams for update

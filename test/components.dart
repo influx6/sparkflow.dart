@@ -15,12 +15,12 @@ void main(){
   
   reader.tap((n){ print('#log  => $n'); });
   
-  feeder.bindPort(repeater.port('inports:in'));
-  repeater.port('outports:out').bindPort(reader);
+  feeder.bindPort(repeater.port('in:in'));
+  repeater.port('out:out').bindPort(reader);
   
   
-  feeder2.bindPort(prefixer.port('inports:in'));
-  prefixer.port('outports:out').bindPort(reader);
+  feeder2.bindPort(prefixer.port('in:in'));
+  prefixer.port('out:out').bindPort(reader);
   
   feeder.send('alex');
   feeder.send('i need salt!');

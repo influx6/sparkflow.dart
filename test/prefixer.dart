@@ -6,20 +6,20 @@ void main(){
   
   var prefixer = StringPrefixer.create();
   
-  prefixer.port('outports:out').tap((n){
+  prefixer.port('out:out').tap((n){
     print('prexifing: $n');
   });
   
-  prefixer.port('inports:in').send('one');
+  prefixer.port('in:in').send('one');
   
   prefixer.port('static:option').send('tag::');
   
-  prefixer.port('inports:in').send('two');
+  prefixer.port('in:in').send('two');
 
-  prefixer.port('inports:in').send('three');
+  prefixer.port('in:in').send('three');
 
   prefixer.port('static:option').send('rat::');
 
-  prefixer.port('inports:in').send('four');
+  prefixer.port('in:in').send('four');
 
 }

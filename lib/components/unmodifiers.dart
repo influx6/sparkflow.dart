@@ -22,7 +22,7 @@ class Repeater extends Component{
   
   Repeater(): super("Repeater"){
     this.meta('desc','a simple synchronous repeater component');
-    this.loopPorts('inports:in','outports:out');
+    this.loopPorts('in:in','out:out');
   }
   
 }
@@ -40,8 +40,8 @@ class ConstValue extends Component{
 		});
     
 		this.port('static:option').dataDrained.once((i){
-		  	this.port('inports:in').tap((k){
-        		this.port('outports:out').send(this._value);
+		  	this.port('in:in').tap((k){
+        		this.port('out:out').send(this._value);
       		});  
 		});
 		

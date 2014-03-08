@@ -882,13 +882,13 @@ class Network extends FlowNetwork{
    this.uuidRegister.add('placeholder',this.placeholder.data.uuid);
    this.stateManager = hub.StateManager.create(this);
   
-   this.networkPorts.createSpace('outports');
-   this.networkPorts.createSpace('inports');
-   this.networkPorts.createSpace('errports');
+   this.networkPorts.createSpace('in');
+   this.networkPorts.createSpace('out');
+   this.networkPorts.createSpace('err');
   
-   this.networkPorts.createPort('outports:out');
-   this.networkPorts.createPort('inports:in');
-   this.networkPorts.createPort('errports:err');
+   this.networkPorts.createPort('out:out');
+   this.networkPorts.createPort('in:in');
+   this.networkPorts.createPort('err:err');
 
    this.connections = ConnectionMeta.create(this);
 
@@ -943,9 +943,9 @@ class Network extends FlowNetwork{
   }
   
   FlowPort port(String n) => this.networkPorts.port(n);
-  FlowPort get nout => this.networkPorts.port('outports:out');
-  FlowPort get nin => this.networkPorts.port('inports:in');
-  FlowPort get nerr => this.networkPorts.port('errports:err');
+  FlowPort get nout => this.networkPorts.port('out:out');
+  FlowPort get nin => this.networkPorts.port('in:in');
+  FlowPort get nerr => this.networkPorts.port('err:err');
   
   void close(){
     this.shutdown();
@@ -1702,6 +1702,10 @@ class PortManager{
     void destroySpace(String id){
       this.portsGroup.destroy(id).close();
     }
+    
+    void destroySpacePorts(String id){
+      this.portsGroup.get(id).close();
+    }
 
     void destroyAllSpaces([Function n]){
       this.portsGroup.onAll((e,k){
@@ -1715,9 +1719,7 @@ class PortManager{
       var path = splitPortMap(id),
           finder = hub.Enums.nthFor(path);
 
-      if(hub.Valids.notExist(path)) return null;
-
-      if(!this.hasSpace(finder(0))) this.createSpace(finder(0));
+      if(hub.Valids.notExist(path) || !this.hasSpace(finder(0))) return null;
 
       if(hub.Valids.exist(port)) this.portsGroup.get(finder(0)).addPortObject(finder(1),port);
       else this.portsGroup.get(finder(0)).addPort(finder(1),meta);
@@ -1858,13 +1860,13 @@ class Component extends FlowComponent{
     this.connections = ConnectionMeta.create(this);
 
     this.createSpace('static');
-    this.createSpace('inports');
-    this.createSpace('errports');
-    this.createSpace('outports');
+    this.createSpace('in');
+    this.createSpace('err');
+    this.createSpace('out');
 
-    this.makePort('inports:in',meta:{'required': true,'datatype':'dynamic'});
-    this.makePort('outports:out',meta:{'required': true,'datatype':'dynamic'});
-    this.makePort('errports:err',meta:{'required': true,'datatype':'dynamic'});
+    this.makePort('in:in',meta:{'required': true,'datatype':'dynamic'});
+    this.makePort('out:out',meta:{'required': true,'datatype':'dynamic'});
+    this.makePort('err:err',meta:{'required': true,'datatype':'dynamic'});
 
     this.makePort('static:option',port:Port.create('option','in',{
       'required': true
@@ -1889,9 +1891,9 @@ class Component extends FlowComponent{
   }
   
   void removeDefaultPorts(){
-    this.comPorts.destroySpace('inports');
-    this.comPorts.destroySpace('errports');
-    this.comPorts.destroySpace('outports');
+    this.comPorts.destroySpacePorts('in');
+    this.comPorts.destroySpacePorts('err');
+    this.comPorts.destroySpacePorts('out');
   }
 
   bool hasPort(String g){

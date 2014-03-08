@@ -28,7 +28,10 @@ class ApplyFunction extends Component{
   }
   
   void init(){
-    var hin = this.port('inports:in'), hout = this.port('outports:out'), hop = this.port('static:option'), herr = this.port('errports:err');
+    var hin = this.port('in:in'), 
+        hout = this.port('out:out'), 
+        hop = this.port('static:option'), 
+        herr = this.port('err:err');
 
     hop.tap((n){
       if(n is Function){
@@ -53,15 +56,15 @@ class Prefixer extends Component{
   Prefixer(Function n,[String id]): super((id == null ? "Prefixer" : id)){
     this._combinator = Transformable.create(n);
     this.meta('desc','prefixing a value to a IP');
-    this.makePort('inports:internalBuffer');
+    this.makePort('in:internalBuffer');
     this.init();
   }
 
   void init(){
-    var i = this.port('inports:in');
-    var o = this.port('outports:out');
+    var i = this.port('in:in');
+    var o = this.port('out:out');
     var m = this.port('static:option');
-    var buffer = this.port('inports:internalBuffer');
+    var buffer = this.port('in:internalBuffer');
     
     m.tap((h){
       this._combinator.change(h);

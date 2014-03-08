@@ -11,7 +11,7 @@ void main(){
   var cosmo = Component.create('cosmo');
 
   //lets loop cosmo in port to its outport,a basic repeater 
-  cosmo.loopPorts('inports:in','outports:out');
+  cosmo.loopPorts('in:in','out:out');
 
   var network = Network.create("testBed");
   
@@ -43,14 +43,14 @@ void main(){
   //repeater wants to connect its 'out' port to cosmo 'in' port;;
   //needed due to the nature of network connections using futures
   network
-  .connect('prefixer','inports:in','repeater','outports:out')
-  .connect('repeater','inports:in','cosmo','outports:out',null,true).boot().then((_){
+  .connect('prefixer','in:in','repeater','out:out')
+  .connect('repeater','in:in','cosmo','out:out',null,true).boot().then((_){
     assert(_ == network);
-	  //its not always necessary for a networks in and outports to be connect,but there are cases eg composite components
+	  //its not always necessary for a networks in and out to be connect,but there are cases eg composite components
 	  //where data must be fed into the network for its components to process
 	      
 	  //we will connect networks in port (nin) to cosmo 'in' port
-	  network.nin.bindPort(cosmo.port('inports:in'));
+	  network.nin.bindPort(cosmo.port('in:in'));
 	  // tap into networks out port 'nout' to see what comes out
 
 	  network.nout.tap((n){
@@ -87,7 +87,7 @@ void main(){
 //	  });
 
 
-	  rep2.port('outports:out').bindPort(network.nout);
+	  rep2.port('out:out').bindPort(network.nout);
 
  	  network.nin.send('sanction'); 
     

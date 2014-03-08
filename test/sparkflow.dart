@@ -72,21 +72,21 @@ void main(){
   	
 	sf..use('transformers/StringPrefixer','stringer')
 	..use('components/component','cosmo',null,null,(m){
-      m.port('inports:in').tap((n){ print('cosmo-in:$n');});
-      m.port('outports:out').tap((n){ print('cosmo-out:$n');});
+      m.port('in:in').tap((n){ print('cosmo-in:$n');});
+      m.port('out:out').tap((n){ print('cosmo-out:$n');});
 	})
 	..use('unModifiers/Repeater','repeater');
   
 	//repeaters-out will feed stringers in
-	sf.ensureBinding('stringer','inports:in','repeater','outports:out');
+	sf.ensureBinding('stringer','in:in','repeater','out:out');
 	//cosmo out will feed repeaters in
-	sf.ensureBinding('repeater','inports:in','cosmo','outports:out');
+	sf.ensureBinding('repeater','in:in','cosmo','out:out');
 	//cosmo in will feed cosmo out
-    sf.ensureBinding('cosmo','outports:out','cosmo','inports:in');
+    sf.ensureBinding('cosmo','out:out','cosmo','in:in');
 	//network(*) in will feed cosmo's in
-	sf.ensureBinding('cosmo','inports:in','*','inports:in');
+	sf.ensureBinding('cosmo','in:in','*','in:in');
 	//cosmo out will feed network out
-	sf.ensureBinding('*','outports:out','stringer','outports:out');
+	sf.ensureBinding('*','out:out','stringer','out:out');
 
 
 	sf.network.connectionStream.on((e){
@@ -103,13 +103,13 @@ void main(){
 
 	sf.boot().then((_){
 	   	  
-		_.port('outports:out').tap((n){
+		_.port('out:out').tap((n){
 			  print('network spouting: $n');
 		});
 
 		_.addInitial('stringer','network::');
 
-		_.port('inports:in').send('sanction'); 
+		_.port('in:in').send('sanction'); 
 
 	});
 	
