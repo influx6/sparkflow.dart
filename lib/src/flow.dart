@@ -1036,7 +1036,7 @@ class Network extends FlowNetwork{
   }
 
   void lockNetworkStreams(){
-    this._networkPorts.onAll((i,e){ e.pause(); });
+    this.networkPorts.onAll((i,e){ e.pause(); });
     this.errorStream.pause();
     this.connectionStream.pause();
     this.componentStream.pause();
@@ -1045,7 +1045,7 @@ class Network extends FlowNetwork{
   }
 
   void unlockNetworkStreams(){
-    this._networkPorts.onAll((i,e){ e.resume(); });
+    this.networkPorts.onAll((i,e){ e.resume(); });
     this.errorStream.resume();
     this.connectionStream.resume();
     this.componentStream.resume();
@@ -1054,7 +1054,7 @@ class Network extends FlowNetwork{
   }
 
   void closeNetworkStreams(){
-    this._networkPorts.onAll((i,e){ e.close(); });
+    this.networkPorts.onAll((i,e){ e.close(); });
     this.errorStream.close();
     this.connectionStream.close();
     this.componentStream.close();
@@ -1498,7 +1498,7 @@ class Network extends FlowNetwork{
   }
 
   Network link(String nport,String com,String inport,[String sid,bool bf,bool inverse]){
-    if(!this._networkPorts.has(nport)) return null;
+    if(!this.networkPorts.has(nport)) return null;
     inverse = hub.Hub.switchUnless(inverse,false);
     this.connectionsCompiler.add((){
       return this.filter(com,bf).then((_){
@@ -1518,7 +1518,7 @@ class Network extends FlowNetwork{
   }
 
   Network unlink(String nport, String com,String comport,[String sid,bool bf,bool inverse]){
-    if(!this._networkPorts.has(nport)) return null;
+    if(!this.networkPorts.has(nport)) return null;
     inverse = hub.Hub.switchUnless(inverse,false);
     this.disconnectionsCompiler.add((){
         return this.filter(com,bf).then((_){
@@ -1697,7 +1697,17 @@ class PortManager{
 
       return this.portsGroup.get(finder(0)).getPort(finder(1));
     }
+  
+    bool has(String id){
+      var path = splitPortMap(id),
+          finder = hub.Enums.nthFor(path);
 
+      if(hub.Valids.notExist(path) || !this.portsGroup.has(finder(0))) 
+        return false;
+
+      return this.portsGroup.get(finder(0)).has(finder(1));
+    
+    }
 }
 
 /*class for component*/
