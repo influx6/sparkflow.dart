@@ -386,8 +386,6 @@ class Socket<M> extends FlowSocket{
   void end(){
     this.detachAll();
     this.streams.close();
-    this.headerPackets.close();
-    this.packets.close();
     this.from = this.to = null;
   }
 
