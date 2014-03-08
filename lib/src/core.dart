@@ -134,7 +134,7 @@ class SparkRegistry{
   }
 
   static dynamic createComponent(String handle,String type,[List l,Map a]){
-    var c =  SparkRegistry.grabComponenet(handle,type);
+    var c =  SparkRegistry.grabComponent(handle,type);
     if(c != null) return c(l,a);
   }
 

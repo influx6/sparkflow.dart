@@ -1421,7 +1421,7 @@ class Network extends FlowNetwork{
   }
 
   Network link(String nport,String com,String inport,[String sid,bool bf,bool inverse]){
-    if(!this.networkPorts.has(nport)) return null;
+    if(!this.networkPorts.hasPort(nport)) return null;
     inverse = hub.Hub.switchUnless(inverse,false);
     this.connectionsCompiler.add((){
       return this.filter(com,bf).then((_){
@@ -1441,7 +1441,7 @@ class Network extends FlowNetwork{
   }
 
   Network unlink(String nport, String com,String comport,[String sid,bool bf,bool inverse]){
-    if(!this.networkPorts.has(nport)) return null;
+    if(!this.networkPorts.hasPort(nport)) return null;
     inverse = hub.Hub.switchUnless(inverse,false);
     this.disconnectionsCompiler.add((){
         return this.filter(com,bf).then((_){
@@ -1695,7 +1695,7 @@ class PortManager{
     }
 
     void createSpace(String id){
-        if(!this.hasSpace(id)) return null;
+        if(this.hasSpace(id)) return null;
         this.portsGroup.add(id,PortGroup.create(id,this.owner));
     }
 
