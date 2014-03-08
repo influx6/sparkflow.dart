@@ -1714,9 +1714,10 @@ class PortManager{
       meta = hub.Funcs.switchUnless(meta,{'datatype':'dynamic'});
       var path = splitPortMap(id),
           finder = hub.Enums.nthFor(path);
-      if(hub.Valids.notExist(path) || !this.portsGroup.has(finder(0))) 
-        return null;
-       
+
+      if(hub.Valids.notExist(path)) return null;
+
+      if(!this.hasSpace(finder(0))) this.createSpace(finder(0));
 
       if(hub.Valids.exist(port)) this.portsGroup.get(finder(0)).addPortObject(finder(1),port);
       else this.portsGroup.get(finder(0)).addPort(finder(1),meta);
