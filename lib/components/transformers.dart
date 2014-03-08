@@ -28,7 +28,7 @@ class ApplyFunction extends Component{
   }
   
   void init(){
-    var hin = this.port('in'), hout = this.port('out'), hop = this.port('option'), herr = this.port('err');
+    var hin = this.port('inports:in'), hout = this.port('outports:out'), hop = this.port('static:option'), herr = this.port('errports:err');
 
     hop.tap((n){
       if(n is Function){
@@ -37,8 +37,8 @@ class ApplyFunction extends Component{
       }else herr.send(new Exception('$n is not a type of function!'));
     });
 
-    hop.dataDrained.once((n){
-        hout.dataTransformer.on(this.handle.out);
+    hop.mixedDrained.once((n){
+        hout.mixedTransformer.on(this.handle.out);
         hin.bindPort(hout);
     });
   }
@@ -53,25 +53,25 @@ class Prefixer extends Component{
   Prefixer(Function n,[String id]): super((id == null ? "Prefixer" : id)){
     this._combinator = Transformable.create(n);
     this.meta('desc','prefixing a value to a IP');
-    this.makePort('internalBuffer','in');
+    this.makePort('inports:internalBuffer');
     this.init();
   }
 
   void init(){
-    var i = this.port('in');
-    var o = this.port('out');
-    var m = this.port('option');
-    var buffer = this.port('internalBuffer');
-
-    m.tap('data',(h){
+    var i = this.port('inports:in');
+    var o = this.port('outports:out');
+    var m = this.port('static:option');
+    var buffer = this.port('inports:internalBuffer');
+    
+    m.tap((h){
       this._combinator.change(h);
     });
     
-    buffer.dataTransformer.on((k){
+    buffer.mixedTransformer.on((k){
       return this._combinator.out(k);
     });
     
-    m.dataDrained.once((n){
+    m.mixedDrained.once((n){
       i.bindPort(buffer);
       buffer.bindPort(o);
     });
@@ -84,7 +84,10 @@ class StringPrefixer extends Prefixer{
 
   static create() => new StringPrefixer();
 
-  StringPrefixer() : super((n,k){ return n+k; },"StringPrefixer");
+  StringPrefixer() : super((n,k){ 
+    return n.data + k.data;
+  
+  },"StringPrefixer");
   
 }
 

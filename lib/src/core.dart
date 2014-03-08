@@ -63,7 +63,7 @@ part 'protocol.dart';
  
 class Packet extends GroupObject{
 
-  static create(g) => new IPSignature(g);
+  static create(g) => new Packet(g);
 
   Packet(g): super(g);
   

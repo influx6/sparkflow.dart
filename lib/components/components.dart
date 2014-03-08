@@ -12,9 +12,9 @@ class Components{
   
   static void registerComponents(){
     Component.registerComponents();
-	UnModifiers.registerComponents();
-	Transformers.registerComponents();
-	Groupers.registerComponents();
+    UnModifiers.registerComponents();
+    Transformers.registerComponents();
+    Groupers.registerComponents();
   }
   
 }
