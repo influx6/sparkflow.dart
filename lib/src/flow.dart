@@ -1103,8 +1103,8 @@ class Network extends FlowNetwork{
   }
 
   Future add(String path,String id,[Function n,List a,Map m]){
-    if(!SparkRegistry.hasGroupString(path)) return new Future.error(new Exception('Component $path not found!'));
-    return this._addComponent(SparkRegistry.generateFromString(path,a,m),id,n);
+    if(!SparkRegistry.hasGroup(path)) return new Future.error(new Exception('Component $path not found!'));
+    return this._addComponent(SparkRegistry.generate(path,a,m),id,n);
   }
 
 
@@ -1671,6 +1671,7 @@ class PortGroup{
       this.pausePort(n);
     });
   }
+
 }
 
 class PortManager{
@@ -1688,13 +1689,25 @@ class PortManager{
       });
       return data;
     }
+    
+    bool hasSpace(String id){
+        return this.portsGroup.has(id);
+    }
 
     void createSpace(String id){
+        if(!this.hasSpace(id)) return null;
         this.portsGroup.add(id,PortGroup.create(id,this.owner));
     }
 
     void destroySpace(String id){
       this.portsGroup.destroy(id).close();
+    }
+
+    void destroyAllSpaces([Function n]){
+      this.portsGroup.onAll((e,k){
+        if(n == null && !!n(e,k)) return k.close();
+        return k.close();
+      });
     }
 
     FlowPort createPort(String id,{Map meta,Port port}){
@@ -1721,7 +1734,7 @@ class PortManager{
       return this.portsGroup.get(finder(0)).getPort(finder(1));
     }
   
-    bool has(String id){
+    bool hasPort(String id){
       var path = splitPortMap(id),
           finder = hub.Enums.nthFor(path);
 
@@ -1743,11 +1756,10 @@ class PortManager{
     }
     
     void close(){
-      this.portsGroup.onAll((e,k){
-          k.close();
-      });
+      this.destroyAllSpaces();
       this.portsGroup.flush();
     }
+    
 
     void resumeAll(){
       this.portsGroup.onAll((e,k){
@@ -1875,8 +1887,14 @@ class Component extends FlowComponent{
 
   }
   
+  void removeDefaultPorts(){
+    this.comPorts.destroySpace('inports');
+    this.comPorts.destroySpace('errports');
+    this.comPorts.destroySpace('outports');
+  }
+
   bool hasPort(String g){
-    return this.comPorts.has(g);
+    return this.comPorts.hasPort(g);
   }
 
   void createSpace(String g){

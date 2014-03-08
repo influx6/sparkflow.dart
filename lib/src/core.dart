@@ -138,34 +138,29 @@ class SparkRegistry{
     if(c != null) return c(l,a);
   }
 
-  static dynamic grabComponenet(String handle,String type){
+  static dynamic grabComponent(String handle,String type){
     var g = SparkRegistry.groups.getGroup(handle);
     if(g != null) return g.get(type);
   }
 
   // true : false => transformers/StringPrefixer
-  static bool hasGroupString(String path){
+  static bool hasGroup(String path){
    return SparkRegistry.groups.hasGroupString(path);
   }
 
   // components/component
-  static void addUsingString(String path,Function n){
+  static void add(String path,Function n){
     return SparkRegistry.groups.addUsingString(path,n);
   }
 
   //transformers/StringPrefixer
-  static dynamic getGroupFromString(String path){
+  static dynamic getGroup(String path){
     return SparkRegistry.groups.getGroupFromString(path);
   }
 
   //transformers/StringPrefixer,[id,name],{id:name}
-  static dynamic generateFromString(String path,[List ops,Map a]){
-    return SparkRegistry.groups.generateFromString(path,ops,a);
-  }
-
-  //transformers/StringPrefixer,[id,name],{id:name}
   static dynamic generate(String path,[List ops,Map a]){
-    return SparkRegistry.generateFromString(path,ops,a);
+    return SparkRegistry.groups.generateFromString(path,ops,a);
   }
 }
 
