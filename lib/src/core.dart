@@ -61,28 +61,24 @@ part 'protocol.dart';
       to automatically run this once a library is imported;
   */ 
  
-class Packet extends GroupObject{
+class Packet extends hub.MapDecorator{
 
-  static create(g) => new Packet(g);
+  static create() => new Packet();
 
-  Packet(g): super(g);
+  Packet(): super();
   
   void init(event,data,owner,portid){
     this.event = event;
     this.data = data;
     this.owner = owner;
     this.port = portid;
+    this.add('originator',owner);
   }
 
   dynamic get event => this.get('event');
   dynamic get data => this.get('data');
   dynamic get owner => this.get('owner');
   dynamic get port => this.get('port');
-  /*dynamic get socket => this.get('socket');*/
-  
-  /*void set socket(FlowSocket d){*/
-  /*  this.update('socket',d);*/
-  /*}*/
 
   void set port(String d){
     this.update('port',d);
@@ -114,12 +110,6 @@ class Packet extends GroupObject{
 
 
 class SparkRegistry{
-
-  static Groups packets = Groups.create((g,d,w,r){
-    var ip = Packet.create(g);
-    ip.init(d,w,r);
-    return ip;
-  });
 
   static SparkGroups groups = SparkGroups.create();
 

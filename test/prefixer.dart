@@ -8,7 +8,6 @@ void main(){
   
   prefixer.port('outports:out').tap((n){
     print('prexifing: $n');
-    n.free();
   });
   
   prefixer.port('inports:in').send('one');

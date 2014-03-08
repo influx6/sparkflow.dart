@@ -125,15 +125,6 @@ final socketFilter = (i,n){
   return false;
 };
 
-final toIP = (type,socket,packets){
-  return (data){
-    if(data is Packet) return data;
-    var d = hub.Funcs.switchUnless(data,null);
-    var packet = packets.make([type,d,null,null]);
-    return packet;
-  };
-};
-
 //filters of socket subscribers with aliases
 final aliasFilterFn = (it,n){
   if(it.current.info.get('alias') == n) return true;
@@ -154,6 +145,18 @@ final List splitPortMap = (String path){
   var part = path.split(':');
   if(part.length <= 1) return null;
   return part;
+};
+
+final toIP = (type,socket,packets){
+  return (data){
+    if(data is Packet) return data;
+    var d = hub.Funcs.switchUnless(data,null);
+    var packet = packets();
+    var port = (socket.from == null ? null : socket.from.id);
+    var owner = ( port == null ? null : (socket.from.owner == null ? null : socket.from.owner.UID));
+    packet.init(type,d,owner,port);
+    return packet;
+  };
 };
 
 class SocketStream<M>{
@@ -200,6 +203,10 @@ class SocketStream<M>{
 }
 
 class Socket<M> extends FlowSocket{
+
+  var _headerPackets = () => Packet.create();
+  var _dataPackets = () => new Packet<M>();
+
   final Distributor continued = Distributor.create('streamable-streamcontinue');
   final Distributor halted = Distributor.create('streamable-streamhalt');
   final String uuid = hub.Hub.randomString(5);
@@ -208,24 +215,14 @@ class Socket<M> extends FlowSocket{
   SocketStream streams;
   FlowPort from,to;
   var filter;
-  Groups headerPackets = Groups.create((g,e,d,o,p){
-    var pack = new Packet<M>(g);
-    pack.init(e,d,o,p);
-    return pack;
-  });
-  Groups packets = Groups.create((g,e,d,o,p){
-     var pack = new Packet<M>(g);
-     pack.init(e,d,o,p);
-     return pack;
-  });
 
 	
   static create([from]) => new Socket(from);
   
   Socket([from]){
-    this.toBGIP = toIP('beginGroup',this,this.headerPackets);
-    this.toEGIP = toIP('endGroup',this,this.headerPackets);
-    this.toDataIP = toIP('data',this,this.packets);
+    this.toBGIP = toIP('beginGroup',this,this._headerPackets);
+    this.toEGIP = toIP('endGroup',this,this._headerPackets);
+    this.toDataIP = toIP('data',this,this._dataPackets);
     this.streams = new SocketStream();
     this.filter = this.subscribers.iterator;
     if(from != null) this.attachFrom(from);
@@ -389,6 +386,8 @@ class Socket<M> extends FlowSocket{
   void end(){
     this.detachAll();
     this.streams.close();
+    this.headerPackets.close();
+    this.packets.close();
     this.from = this.to = null;
   }
 
@@ -1584,11 +1583,12 @@ class PortGroup{
   final portLists = new hub.MapDecorator();
   FlowComponent owner;
   String groupClass;
-  Groups packets = Groups.create((g,d,w,r,e){
-    var ip = Packet.create(g);
+
+  var _packets = (d,w,r,e){
+    var ip = Packet.create();
     ip.init(d,w,r,e);
     return ip;
-  });
+  };
   
   static create(g,[m]) => new PortGroup(g,m);
 
@@ -1616,21 +1616,21 @@ class PortGroup{
     var port = Port.create(name,this.groupClass,hub.Enums.merge(meta,this.defaults),this.owner);
     var metad = new Map.from(port.meta.storage);
     this.portLists.add(name,port);
-    this.events.emit(this.packets.make(['addPort',metad,port.owner,port.id]));
+    this.events.emit(this._packets('addPort',metad,port.owner,port.id));
   }
   
   void addPortObject(String name,Port p){
     if(this.portLists.has(name)) return null;
     var metad = new Map.from(p.meta.storage);
     this.portLists.add(name,p);
-    this.events.emit(this.packets.make(['addPort',metad,p.owner,p.id]));
+    this.events.emit(this._packets('addPort',metad,p.owner,p.id));
   }
 
   dynamic removePort(String name){
     if(!this.portLists.has(name)) return null;
     var port = this.portLists.destroy(name);
     var meta = new Map.from(port.meta);
-    this.events.emit(this.packets.make(['removePort',meta,port.owner,port.id]));
+    this.events.emit(this._packets('removePort',meta,port.owner,port.id));
     port.clearHooks();
     return port;
   }
@@ -1639,29 +1639,24 @@ class PortGroup{
     return this.portLists.has(name);
   }
   
-  void forcePacketFlush(){
-    this.packets.flush();
-  }
-
   void close(){
     this.portLists.onAll((n,k){
       k.close();
     });
     this.portLists.flush();
-    this.packets.close();
   }
   
   void pausePort(String name){
     if(!this.portLists.has(name)) return null;
     var port = this.portLists.get(name);
-    this.events.emit(this.packets.make(['pausePort',new Map.from(port.meta.storage),port.owner,port.id]));
+    this.events.emit(this._packets('pausePort',new Map.from(port.meta.storage),port.owner,port.id));
     return port.pause();
   }
 
   void resumePort(String name){
     if(!this.portLists.has(name)) return null;
     var port = this.portLists.get(name);
-    this.events.emit(this.packets.make(['resumePort',new Map.from(port.meta.storage),port.owner,port.id]));
+    this.events.emit(this._packets('resumePort',new Map.from(port.meta.storage),port.owner,port.id));
     return port.resume();
   }
 
