@@ -914,7 +914,7 @@ class Network extends FlowNetwork{
 
    this.connectionStream.on((e){
 
-     if(e['to'] == '*'){
+     if(e['to'] == '*' && e['from'] != '*'){
 
          if(e['type'] == 'loop' || e['type'] == 'link'){
            this.connections.addConnection(e['toPort'],e['from'],e['fromPort'],e['socketid']);
@@ -925,7 +925,7 @@ class Network extends FlowNetwork{
          }
      }
 
-     if(e['from'] == '*'){
+     if(e['from'] == '*' && e['to'] != '*'){
 
          if(e['type'] == 'loop' || e['type'] == 'link'){
            this.connections.addConnection(e['fromPort'],e['to'],e['toPort'],e['socketid']);
@@ -1172,7 +1172,7 @@ class Network extends FlowNetwork{
 
       if(hub.Valids.exist(p1) && hub.Valids.exist(p2)){
         p1.bindPort(p2,sid);
-        this.connectionStream.emit(SparkFlowMessages.network('loopPorts','*','*',p,s,sid));
+        this.connectionStream.emit(SparkFlowMessages.network('loop','*','*',p,s,sid));
       }  
       return new Future.value([p1,p2]);
     };
@@ -1188,7 +1188,7 @@ class Network extends FlowNetwork{
 
       if(hub.Valids.exist(p1) && hub.Valids.exist(p2)){
         p1.unbindPort(p2);
-        this.connectionStream.emit(SparkFlowMessages.network('unloopPorts','*','*',p,s,sid));
+        this.connectionStream.emit(SparkFlowMessages.network('unloop','*','*',p,s,sid));
       }
       return new Future.value([p1,p2]);
     };
