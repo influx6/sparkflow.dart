@@ -1959,7 +1959,7 @@ class Component extends FlowComponent{
   }
 
   Future shutdown(){
-    this.comPorts.close();
+    /* this.comPorts.close(); */
     this.stateStream.emit({'type':'shutdown','id': this.id,'uuid':this.metas.get('uuid')});
     if(this.network != null) return this.network.shutdown();
     return new Future.value(this);
