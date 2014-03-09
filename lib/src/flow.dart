@@ -1638,12 +1638,16 @@ class PortGroup{
   }
   
   void close(){
+    this.flushAll();
     this.portLists.onAll((n,k){
       k.close();
     });
-    this.portLists.flush();
   }
   
+  void destroyAll(){
+    this.portLists.flush();
+  }
+
   void pausePort(String name){
     if(!this.portLists.has(name)) return null;
     var port = this.portLists.get(name);
@@ -1658,6 +1662,13 @@ class PortGroup{
     return port.resume();
   }
 
+  void flushPort(String name){
+    if(!this.portLists.has(name)) return null;
+    var port = this.portLists.get(name);
+    this.events.emit(this._packets('flushPort',new Map.from(port.meta.storage),port.owner,port.id));
+    return port.flushPackets();
+  }
+
   void resumeAll(){
     this.portLists.onAll((n,k){
       this.resumePort(n);
@@ -1667,6 +1678,12 @@ class PortGroup{
   void pauseAll(){
     this.portLists.onAll((n,k){
       this.pausePort(n);
+    });
+  }
+
+  void flushAll(){
+    this.portLists.onAll((n,k){
+      this.flushPort(n);
     });
   }
 
@@ -1758,9 +1775,20 @@ class PortManager{
     
     void close(){
       this.destroyAllSpaces();
+    }
+
+    void destroyAll(){
+      this.portsGroup.onAll((e,k){
+        return k.destroyAll();
+      });
       this.portsGroup.flush();
     }
-    
+
+    void flushAllPackets(){
+      this.portsGroup.onAll((e,k){
+         k.flushAll();
+      });
+    }
 
     void resumeAll(){
       this.portsGroup.onAll((e,k){
@@ -1771,6 +1799,18 @@ class PortManager{
     void pauseAll(){
       this.portsGroup.onAll((e,k){
           k.pauseAll();
+      });
+    }
+
+    void flushPort(String n){
+      this.opsOnPort(n,(g,nm){
+
+        hub.Funcs.when(hub.Valids.exist(nm),(){
+            g.flushPort(nm);
+        },(){
+           g.flushAll();
+        });
+
       });
     }
 
@@ -1959,7 +1999,7 @@ class Component extends FlowComponent{
   }
 
   Future shutdown(){
-    /* this.comPorts.close(); */
+    this.comPorts.close();
     this.stateStream.emit({'type':'shutdown','id': this.id,'uuid':this.metas.get('uuid')});
     if(this.network != null) return this.network.shutdown();
     return new Future.value(this);
