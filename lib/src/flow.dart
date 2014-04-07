@@ -118,6 +118,7 @@ abstract class FlowNetwork{
   void set belongsTo(FlowComponent n){ this._parent = n; }
 }
 
+final _nopacket = (){};
 
 final socketFilter = (i,n){
   var socks = i.current;
@@ -211,6 +212,8 @@ class Socket<M> extends FlowSocket{
   final Distributor halted = Distributor.create('streamable-streamhalt');
   final String uuid = hub.Hub.randomString(5);
   final subscribers = ds.dsList.create();
+
+  hub.Mutator bgconditions,egconditions,dtconditions;
   Function toBGIP,toEGIP,toDataIP;
   SocketStream streams;
   FlowPort from,to;
@@ -225,19 +228,68 @@ class Socket<M> extends FlowSocket{
     this.toDataIP = toIP('data',this,this._dataPackets);
     this.streams = new SocketStream();
     this.filter = this.subscribers.iterator;
+
+    this.dtconditions = new hub.Mutator('data-conditions');
+    this.bgconditions = new hub.Mutator('begingroup-conditions');
+    this.egconditions = new hub.Mutator('endgroup-conditions');
+
     if(from != null) this.attachFrom(from);
+    
+    var emits = (n){ 
+      if(n != _nopacket) 
+        return this.mixedStream.emit(n);
+    };
+
+    this.dtconditions.whenDone(emits);
+    this.bgconditions.whenDone(emits);
+    this.egconditions.whenDone(emits);
+
+  }
+  
+  void forceCondition(bool n(dynamic r)){
+    this.dtconditions.on((d){
+      if(!!n(d.data)) return d;
+      return _nopacket;
+    });
+  }
+  
+  void forceBGCondition(bool n(dynamic r)){
+    this.bgconditions.on((d){
+      if(!!n(d.data)) return d;
+      return _nopacket;
+    });
+  }
+
+  void forceEGCondition(bool n(dynamic r)){
+    this.egconditions.on((d){
+      if(!!n(d.data)) return d;
+      return _nopacket;
+    });
+  }
+
+  void flushDataConditions() => this.dtconditions.freeListeners();
+  void flushBGConditions() => this.bgconditions.freeListeners();
+  void flushEGConditions() => this.egconditions.freeListeners();
+
+  void flushAllConditions(){
+    this.flushDataConditions();
+    this.flushEGConditions();
+    this.flushBGConditions();
   }
 
   void send(packet){
-    this.mixedStream.emit(this.toDataIP(packet));
+    var pack = this.toDataIP(packet);
+    this.dtconditions.emit(pack);
   }
 
   void endGroup(packet){
-    this.mixedStream.emit(this.toEGIP(packet));
+    var pack = this.toEGIP(packet);
+    this.egconditions.emit(pack);
   }
 
   void beginGroup(packet){
-    this.mixedStream.emit(this.toBGIP(packet));
+    var pack = this.toBGIP(packet);
+    this.bgconditions.emit(pack);
   }
 
   void setMax(int m){
@@ -435,6 +487,16 @@ class Port<M> extends FlowPort<M>{
 
   String get portClass => this.meta.get('class');
   
+  void forceCondition(n) => this.socket.forceCondition(n);
+  void forceBGCondition(n) => this.socket.forceBGCondition(n);
+  void forceEGCondition(n) => this.socket.forceEGCondition(n);
+
+  void flushDataConditions() => this.socket.flushDataConditions();
+  void flushBGConditions() => this.socket.flushBGConditions();
+  void flushEGConditions() => this.socket.flushEGConditions();
+
+  void flushAllConditions() => this.socket.flushAllConditions();
+
   dynamic handleType(String type,data,FlowSocket socket){
     if(hub.Valids.match(type,'data')) return socket.toDataIP(data);
     if(hub.Valids.match(type,'beginGroup')) return socket.toBGIP(data);

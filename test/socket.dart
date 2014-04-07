@@ -13,13 +13,19 @@ void main(){
     print('#fromPort recieves: $n');
   });
   
+  toPort.forceCondition((n){ return (n is String); });
+
   toPort.send('think');
   toPort.send('straight');
   toPort.send('my');
+  
+  toPort.send(1);
+
   toPort.beginGroup('<people>');
-  toPort.send('people');
+  toPort.send('sunday');
   toPort.send('!');
   toPort.endGroup('</people>');
+  
 
   toPort.unbindSocket(fromPort);
 
