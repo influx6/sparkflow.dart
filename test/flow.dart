@@ -20,7 +20,7 @@ void main(){
 
 	fromPort.send('love');
 	fromPort.beginGroup('<note>');
-	fromPort.send('i need a woman who heart will be mine!');
+	fromPort.send('i need a drink!');
 	fromPort.endGroup('</note>');
 
   
