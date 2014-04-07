@@ -152,7 +152,7 @@ final toIP = (type,socket,packets){
     if(data is Packet) return data;
     var d = hub.Funcs.switchUnless(data,null);
     var packet = packets();
-    var port = (socket.from == null ? null : socket.from.id);
+    var port = (socket.from == null ? null : socket.from.tag);
     var owner = ( port == null ? null : (socket.from.owner == null ? null : socket.from.owner.UID));
     packet.init(type,d,owner,port);
     return packet;
@@ -423,6 +423,7 @@ class Port<M> extends FlowPort<M>{
     this._transformer = this.mixedStream.cloneTransformer();
     this.meta.update('class',pc);
     this.meta.update('id',id);
+    this.meta.update('tag',this.meta.get('class')+":"+id);
   }
     
   void renamePort(String name){
@@ -430,6 +431,7 @@ class Port<M> extends FlowPort<M>{
   }
 
   String get id => this.meta.get('id');
+  String get tag => this.meta.get('tag');
 
   String get portClass => this.meta.get('class');
   
@@ -1598,7 +1600,8 @@ class PortGroup{
       m[e] = {
         'id': e,
         'meta': new Map.from(k.meta.storage),
-        'component': (hub.Valids.exist(k.owner) ? k.owner.UID : null)
+        'component': (hub.Valids.exist(k.owner) ? k.owner.UID : null),
+        'tag': k.tag
       };
     });
 
@@ -1885,9 +1888,11 @@ class Component extends FlowComponent{
     proto.setGroup(payload.get('metas')['group']);
 
     payload.get('ports').forEach((n,k){
-      var finder =- hub.Enums.nthFor(k);
-      proto.createPortGroup(n);
-      proto.makePort(finder('id'),finder('meta'));
+      k.forEach((v,i){
+        var finder = hub.Enums.nthFor(i);
+        proto.createSpace(n);
+        proto.makePort(finder('tag'),meta:finder('meta'));
+      });
     });
     
     return proto;

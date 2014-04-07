@@ -1,4 +1,4 @@
-library flow.specs;
+/* library flow.specs; */
 
 import 'package:sparkflow/sparkflow.dart';
 import 'package:sparkflow/components/transformers.dart';
@@ -33,8 +33,9 @@ void main(){
   feeder2.send('2');
   feeder2.send('4');
 
-  //print(repeater.toMeta);
-  /* var a = Component.createFrom(repeater.toMeta); */
+  /* print(repeater.toMeta); */
+  var a = Component.createFrom(repeater.toMeta);
+  /* print(a.toMeta); */
   
 }
 
