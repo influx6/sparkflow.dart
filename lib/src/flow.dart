@@ -475,7 +475,7 @@ class Port<M> extends FlowPort<M>{
     this._transformer = this.mixedStream.cloneTransformer();
     this.meta.update('class',pc);
     this.meta.update('id',id);
-    this.meta.update('tag',this.meta.get('class')+":"+id);
+    this.meta.update('tag',this.meta.get("class")+":"+id);
   }
     
   void renamePort(String name){
@@ -1798,6 +1798,7 @@ class PortManager{
       meta = hub.Funcs.switchUnless(meta,{'datatype':'dynamic'});
       var path = splitPortMap(id),
           finder = hub.Enums.nthFor(path);
+        
 
       if(hub.Valids.notExist(path) || !this.hasSpace(finder(0))) return null;
 
