@@ -33,7 +33,10 @@
   - .. and so much more :)
   
 
-    
+####Introduction
+  You can find a nice ,simple introduction guide into sparkflow in its
+wiki located at https://github.com/influx6/sparkflow.dart/wiki/SparkFlow-101  
+
 ######ThanksGiving    
 I just wish to show great gratitude to God for helping to get this code to this level,being a long time,experimenting and moving back and forth between JavaScript and Dart towards reaching my goal of an awesome framework or approach to develop consistent web applications,though the road is still long but i can finally say first milestone has been reached and it wont have been possible without God's merciful hands. Let his name be praised.
 Woot!
