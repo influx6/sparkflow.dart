@@ -213,7 +213,7 @@ class Socket<M> extends FlowSocket{
   final String uuid = hub.Hub.randomString(5);
   final subscribers = ds.dsList.create();
 
-  hub.Mutator bgconditions,egconditions,dtconditions;
+  hub.ConditionMutator bgconditions,egconditions,dtconditions;
   Function toBGIP,toEGIP,toDataIP;
   SocketStream streams;
   FlowPort from,to;
@@ -229,14 +229,14 @@ class Socket<M> extends FlowSocket{
     this.streams = new SocketStream();
     this.filter = this.subscribers.iterator;
 
-    this.dtconditions = new hub.Mutator('data-conditions');
-    this.bgconditions = new hub.Mutator('begingroup-conditions');
-    this.egconditions = new hub.Mutator('endgroup-conditions');
+    this.dtconditions = new hub.ConditionMutator('data-conditions');
+    this.bgconditions = new hub.ConditionMutator('begingroup-conditions');
+    this.egconditions = new hub.ConditionMutator('endgroup-conditions');
 
     if(from != null) this.attachFrom(from);
     
     var emits = (n){ 
-      if(n != _nopacket) 
+      if(n != null) 
         return this.mixedStream.emit(n);
     };
 
@@ -249,42 +249,42 @@ class Socket<M> extends FlowSocket{
   void forcePacketCondition(bool n(dynamic r)){
     this.dtconditions.on((d){
       if(!!n(d)) return d;
-      return _nopacket;
+      return null;
     });
   }
   
   void forceBGPacketCondition(bool n(dynamic r)){
     this.bgconditions.on((d){
       if(!!n(d)) return d;
-      return _nopacket;
+      return null;
     });
   }
 
   void forceEGPacketCondition(bool n(dynamic r)){
     this.egconditions.on((d){
       if(!!n(d)) return d;
-      return _nopacket;
+      return null;
     });
   }
 
   void forceCondition(bool n(dynamic r)){
     this.dtconditions.on((d){
       if(!!n(d.data)) return d;
-      return _nopacket;
+      return null;
     });
   }
   
   void forceBGCondition(bool n(dynamic r)){
     this.bgconditions.on((d){
       if(!!n(d.data)) return d;
-      return _nopacket;
+      return null;
     });
   }
 
   void forceEGCondition(bool n(dynamic r)){
     this.egconditions.on((d){
       if(!!n(d.data)) return d;
-      return _nopacket;
+      return null;
     });
   }
 
