@@ -246,6 +246,27 @@ class Socket<M> extends FlowSocket{
 
   }
   
+  void forcePacketCondition(bool n(dynamic r)){
+    this.dtconditions.on((d){
+      if(!!n(d)) return d;
+      return _nopacket;
+    });
+  }
+  
+  void forceBGPacketCondition(bool n(dynamic r)){
+    this.bgconditions.on((d){
+      if(!!n(d)) return d;
+      return _nopacket;
+    });
+  }
+
+  void forceEGPacketCondition(bool n(dynamic r)){
+    this.egconditions.on((d){
+      if(!!n(d)) return d;
+      return _nopacket;
+    });
+  }
+
   void forceCondition(bool n(dynamic r)){
     this.dtconditions.on((d){
       if(!!n(d.data)) return d;
@@ -487,6 +508,9 @@ class Port<M> extends FlowPort<M>{
 
   String get portClass => this.meta.get('class');
   
+  void forcePacketCondition(n) => this.socket.forcePacketCondition(n);
+  void forceBGPacketCondition(n) => this.socket.forceBGPacketCondition(n);
+  void forceEGPacketCondition(n) => this.socket.forceEGPacketCondition(n);
   void forceCondition(n) => this.socket.forceCondition(n);
   void forceBGCondition(n) => this.socket.forceBGCondition(n);
   void forceEGCondition(n) => this.socket.forceEGCondition(n);
