@@ -1177,6 +1177,12 @@ class Network extends FlowNetwork{
     return this._addComponent(SparkRegistry.generate(path,a,m),id,n);
   }
 
+  Future destroy(String name,[Function n,bool bf]){
+    if(!this.uuidRegister.has(name)) return null;
+    this.remove(name,n,bf).then((_){
+      return _.data.kill();
+    });
+  }
 
   Future remove(String a,[Function n,bool bf]){
     if(!this.uuidRegister.has(a)) return null;
@@ -1322,6 +1328,7 @@ class Network extends FlowNetwork{
         },(it){
           completer.complete(this);
         });
+
         this.stateManager.switchState('dead');
         this.networkStream.emit({ 'type':"shutdownNetwork",'status':true, 'message': 'shutting down/killing network operations'});
         this.onDead.emit(this);
@@ -1797,7 +1804,7 @@ class PortManager{
 
     void destroyAllSpaces([Function n]){
       this.portsGroup.onAll((e,k){
-        if(n == null && !!n(e,k)) return k.close();
+        if(n != null && !!n(e,k)) return k.close();
         return k.close();
       });
     }
@@ -1806,7 +1813,6 @@ class PortManager{
       meta = hub.Funcs.switchUnless(meta,{'datatype':'dynamic'});
       var path = splitPortMap(id),
           finder = hub.Enums.nthFor(path);
-        
 
       if(hub.Valids.notExist(path) || !this.hasSpace(finder(0))) return null;
 
@@ -1917,6 +1923,10 @@ class PortManager{
 class Component extends FlowComponent{
   final connectionStream = Streamable.create();
   final stateStream = Streamable.create();
+  final bootups = Distributor.create('connection_bootup');
+  final freezups = Distributor.create('connection_freeze');
+  final shutdowns = Distributor.create('connection_shutdowns');
+  hub.StateManager sharedState;
   var connections,network,_optionsPort,_networkIIP;
   PortManager comPorts;
 
@@ -1972,6 +1982,25 @@ class Component extends FlowComponent{
   Component([String id]): super((id == null ? 'Component' : id)){
     this.comPorts = PortManager.create(this);
     this.connections = ConnectionMeta.create(this);
+    this.sharedState = hub.StateManager.create(this);
+
+    this.sharedState.add('booted',{
+      'frozen': (t,c){ return false; },
+      'dead': (t,c){ return false; },
+      'alive': (t,c){ return true; },
+    });
+
+    this.sharedState.add('frozen',{
+      'frozen': (t,c){ return true; },
+      'dead': (t,c){ return false; },
+      'alive': (t,c){ return false; },
+    });
+
+    this.sharedState.add('shutdown',{
+      'frozen': (t,c){ return false; },
+      'dead': (t,c){ return true; },
+      'alive': (t,c){ return false; },
+    });
 
     this.createSpace('static');
     this.createSpace('in');
@@ -2002,8 +2031,21 @@ class Component extends FlowComponent{
 
     });
 
+    this.sharedState.switchState('shutdown');
   }
   
+  bool get isAlive{
+    return this.sharedState.run('alive');
+  }
+
+  bool get isFrozen{
+    return this.sharedState.run('frozen');
+  }
+
+  bool get isDead{
+    return this.sharedState.run('dead');
+  }
+
   void removeDefaultPorts(){
     this.comPorts.destroySpacePorts('in');
     this.comPorts.destroySpacePorts('err');
@@ -2025,33 +2067,18 @@ class Component extends FlowComponent{
   FlowPort port(String n){
     return this.comPorts.port(n);
   }
-
-  void subnetPortConnect(){
-    var n = this.network;
-    this.port('static:iip').tap((v){
-        if(v is Map) n.addInitial(v['id'],v['data']);
-    });
-  }
-
-  void subnetPortDisconnect(){
-    var n = this.network;
-    this.port('static:iip').flushPackets();
-  }
   
   void useSubnet(Network n){
     if(this.network != null) return null;
     this.network = n;
-    this.subnetPortConnect();
   }
 
   void enableSubnet(){
     this.network = Network.create(this.id+':Subnet');
-    this.subnetPortConnect();
   }
 
   void disableSubnet(){
     if(this.network == null) return;
-    this.subnetPortDisconnect();
     this.network.close();
     this.network = null;
   }
@@ -2060,25 +2087,52 @@ class Component extends FlowComponent{
     return new Map.from(this.connections.storage);
   }
 
+  void ensureOnBoot(Function n){
+    this.bootups.on(n);
+  }
+
+  void ensureOnFreeze(Function n){
+    this.freezups.on(n);
+  }
+
+  void ensureOnShutdown(Function n){
+    this.shutdowns.on(n);
+  }
+
   Future boot(){
+    if(this.isAlive) return new Future.value(this);
+    if(this.isDead) this.bootups.emit(this);
     this.comPorts.resumeAll();
     this.stateStream.emit({'type':'boot','id': this.id,'uuid':this.metas.get('uuid')});
+    this.sharedState.switchState('booted');
     if(this.network != null) return this.network.boot();
     return new Future.value(this);
   }
 
   Future freeze(){
+    if(this.isFrozen) return new Future.value(this);
+    this.freezups.emit(this);
     this.comPorts.pauseAll();
     this.stateStream.emit({'type':'freeze','id': this.id,'uuid':this.metas.get('uuid')});
+    this.sharedState.switchState('frozen');
     if(this.network != null) return this.network.freeze();
     return new Future.value(this);
   }
 
   Future shutdown(){
-    this.comPorts.close();
+    if(this.isDead) return new Future.value(this);
+    this.shutdowns.emit(this);
+    this.comPorts.flushAllPackets();
+    this.comPorts.pauseAll();
     this.stateStream.emit({'type':'shutdown','id': this.id,'uuid':this.metas.get('uuid')});
+    this.sharedState.switchState('shutdown');
     if(this.network != null) return this.network.shutdown();
     return new Future.value(this);
+  }
+
+  Future kill(){
+    this.comPorts.close();
+    return this.shutdown();
   }
 
   dynamic bind(String myport,Component component,String toport,[String mysocketId]){
@@ -2097,15 +2151,8 @@ class Component extends FlowComponent{
     var myPort = this.port(myport),
           toPort = component.port(toport);
     
-    
     this.connectionStream.emit(SparkFlowMessages.componentConnection('unbind',component.UID,this.UID,toport,myport,mysocketId));
     return toPort.unbindPort(myPort);
-  }
-  
-
-  void close(){
-    this.disableSubnet();
-    this.ports.onAll((n) => n.detach());
   }
   
   void unloopPorts(String v,String u){
@@ -2128,5 +2175,9 @@ class Component extends FlowComponent{
     }
   }
 
+  void close(){
+    this.disableSubnet();
+    this.ports.onAll((n) => n.detach());
+  }
 
 }
