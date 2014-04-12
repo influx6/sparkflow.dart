@@ -212,6 +212,8 @@ class Socket<M> extends FlowSocket{
   final Distributor halted = Distributor.create('streamable-streamhalt');
   final String uuid = hub.Hub.randomString(5);
   final subscribers = ds.dsList.create();
+  final Distributor onSocketSubscription = Distributor.create('streamable-socketsub');
+  final Distributor onSocketRemoval = Distributor.create('streamable-socketUnsub');
 
   hub.ConditionMutator bgconditions,egconditions,dtconditions;
   Function toBGIP,toEGIP,toDataIP;
@@ -361,10 +363,10 @@ class Socket<M> extends FlowSocket{
     var sub,handle = this.subscribers.iterator;
     while(handle.moveNext()){
       sub = handle.current;
+      this.onSocketRemoval.emit(sub);
       sub.get('stream').close();
       sub.destroy('socket');
       sub.destroy('port');
-      sub.flush();
     }
   }
 
@@ -403,18 +405,32 @@ class Socket<M> extends FlowSocket{
     return sub;
   }
 
+  void whenSocketSubscribe(Function n){
+    this.onSocketSubscription.on(n);
+  }
+
+  void whenSocketUnsubscribe(Function n){
+    this.onSocketRemoval.on(n);
+  }
+
+  void clearSubscriptionWatchers() => this.onSocketSubscription.free();
+  void clearUnsubscriptionWatchers() => this.onSocketRemoval.free();
+  void clearAllSubscriptionWatchers() => this.clearSubscriptionWatchers() && this.clearUnsubscriptionWatchers();
+
   dynamic bindSocket(Socket a){
     if(this.filter.has(a,socketFilter)) return null;
     var sub = hub.Hub.createMapDecorator();
     sub.add('socket',a);
     sub.add('stream',this.mixedStream.subscribe(a.send));
     this.subscribers.add(sub);
+    this.onSocketSubscription.emit(sub);
     return sub;
   }
   
   dynamic unbindSocket(Socket a){
     if(!this.filter.has(a,socketFilter)) return null;
     var sub = this.filter.remove(a,null,socketFilter).data;
+    this.onSocketRemoval.emit(sub);
     sub.get('stream').close();
     sub.destroy('socket');
     sub.destroy('port');
@@ -640,7 +656,7 @@ class Port<M> extends FlowPort<M>{
     var sub = this.socket.unbindSocket(v);
     if(sub == null) return null;
     this.removeSocketAlias(sub.get('alias'));
-    sub.flush();
+    // sub.flush();
     return sub;
   }
   
