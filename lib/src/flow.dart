@@ -236,7 +236,6 @@ class Socket<M> extends FlowSocket{
     this.egconditions = hub.Hub.createCondition('endgroup-conditions');
 
     if(from != null) this.attachFrom(from);
-    
 
     this.dtconditions.whenDone(this.mixedStream.emit);
     this.bgconditions.whenDone(this.mixedStream.emit);
@@ -423,6 +422,7 @@ class Socket<M> extends FlowSocket{
     sub.add('socket',a);
     sub.add('stream',this.mixedStream.subscribe(a.send));
     this.subscribers.add(sub);
+    a.mixedStream.whenClosed(sub.get('stream').close);
     this.onSocketSubscription.emit(sub);
     return sub;
   }
@@ -1029,10 +1029,25 @@ class Network extends FlowNetwork{
   }
   
   FlowPort port(String n) => this.networkPorts.port(n);
-  FlowPort get nout => this.networkPorts.port('out:out');
-  FlowPort get nin => this.networkPorts.port('in:in');
-  FlowPort get nerr => this.networkPorts.port('err:err');
   
+  dynamic createSpace(String sp){
+    return this.networkPorts.createSpace(sp);
+  }
+
+  FlowPort makePort(String id,{ Map meta: null,Port port:null }){
+    return this.networkPorts.createPort(id,meta:meta,port:port);
+  }
+
+  dynamic removePort(String path){
+    return this.networkPorts.destroyPort(path);
+  }
+
+  void removeDefaultPorts(){
+    this.removePort('in:in');
+    this.removePort('out:out');
+    this.removePort('err:err');
+  }
+
   void close(){
     this.shutdown();
     this.graph.cascade((e){
@@ -1805,6 +1820,10 @@ class PortManager{
         return this.portsGroup.has(id);
     }
 
+    dynamic getSpace(String id){
+      return this.portsGroup.get(id);
+    }
+
     void createSpace(String id){
         if(this.hasSpace(id)) return null;
         this.portsGroup.add(id,PortGroup.create(id,this.owner));
@@ -1836,6 +1855,17 @@ class PortManager{
       else this.portsGroup.get(finder(0)).addPort(finder(1),meta);
 
       return this.port(id);
+    }
+
+    FlowPort destroyPort(String id){
+      if(!this.hasPort(id)) return null;
+
+      var path = splitPortMap(id),
+          finder = hub.Enums.nthFor(path);
+
+      var port = this.getSpace(finder(0)).destroy(finder(1));
+      if(hub.Valids.exist(port)) port.close();
+      return port;
     }
 
     FlowPort port(String id){
