@@ -1,5 +1,5 @@
 name: sparkflow
-version: 0.2.7
+version: 0.2.8
 author: Alexander Ewetumo <trinoxf@gmail.com>
 description: A flow-based approach to app development using a simple expressive approach
 homepage: http://github.com/influx6/sparkflow.dart
