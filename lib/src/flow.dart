@@ -216,6 +216,7 @@ class Socket<M> extends FlowSocket{
   final Distributor onSocketRemoval = Distributor.create('streamable-socketUnsub');
 
   hub.ConditionMutator bgconditions,egconditions,dtconditions;
+  /* hub.Counter counter; */
   Function toBGIP,toEGIP,toDataIP;
   SocketStream streams;
   FlowPort from,to;
@@ -230,6 +231,7 @@ class Socket<M> extends FlowSocket{
     this.toDataIP = toIP('data',this,this._dataPackets);
     this.streams = new SocketStream();
     this.filter = this.subscribers.iterator;
+    /* this.counter = new hub.Counter(this); */
 
     this.dtconditions = hub.Hub.createCondition('data-conditions');
     this.bgconditions = hub.Hub.createCondition('begingroup-conditions');
@@ -455,7 +457,6 @@ class Socket<M> extends FlowSocket{
     this.halted.emit(true);
   }
 
-
   void end(){
     this.detachAll();
     this.streams.close();
@@ -464,6 +465,7 @@ class Socket<M> extends FlowSocket{
 
   void close() => this.end();
   
+  bool get hasSocketSubscribers => !this.subscribers.isEmpty;
   bool get hasConnections => this.mixedStream.hasConnections;
   bool get isResumed => this.mixedStream.streamResumed;
   bool get isPaused => this.mixedStream.streamPaused;
