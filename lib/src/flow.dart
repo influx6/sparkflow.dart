@@ -1413,6 +1413,33 @@ class Network extends FlowNetwork{
 
     return this.whenAlive;
   }
+  
+  Future send(String id,String port,dynamic d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.send(d);
+        });
+    });
+  }
+
+  Future beginGroup(String id,String port,dynamic d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.beginGroup(d);
+        });
+    });
+  }
+
+  Future endGroup(String id,String port,dynamic d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.endGroup(d);
+        });
+    });
+  }
 
   Map get toMeta{
     var meta = {};
