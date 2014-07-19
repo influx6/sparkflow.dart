@@ -1,0 +1,44 @@
+{	  
+ 	  "name":"sparkflow", 
+ 	 	 
+ 	 "description":"an fbp implementation for dartlang", 
+ 	 	 
+ 	 "version":"0.1.1", 
+ 	 	 
+ 	 "license":"mit", 
+ 	 	 
+ 	 "install_dir":"./packages", 
+ 	 	 
+ 	 "depends":{ 
+		 "ds":{ 
+			  "type":"dartpath", 
+			 "url":"../ds"
+		 }, 
+			 
+		 "streamable":{ 
+			  "type":"dartpath", 
+			 "url":"../streamable"
+		 }, 
+			 
+		 "hub":{ 
+			  "type":"dartpath", 
+			 "url":"../hub"
+		 }, 
+			 
+		 "browser":{ 
+			  "type":null, 
+			 "url":null, 
+			 "version":null 
+		 }, 
+			 
+		 "sparkflow":{ 
+			  "type":"dartpath", 
+			 "url":"."
+		 },
+
+		 "guardedfs":{ 
+			  "type":"dartpath", 
+			 "url":"../guardedfs"
+		 } 
+ 	 } 
+ }
