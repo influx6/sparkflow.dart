@@ -1106,7 +1106,7 @@ class Network extends FlowNetwork{
   //timestamps
   var startStamp,stopStamp;
   // iterator for the graph and iips
-  var graphIterator, iipDataIterator,scheduledPacketsIterator;
+  var graphIterator, iipDataIterator,scheduledPacketsIterator,scheduledPacketsBackupIterator;
   // initial sockets list iterator
   var IIPSocketFilter;
   //graph node placeholder
@@ -1143,6 +1143,7 @@ class Network extends FlowNetwork{
   // list of initial packets to sent out on boot
   final IIPackets = ds.dsList.create();
   final scheduledPackets = ds.dsList.create();
+  final scheduledPacketsBackup = ds.dsList.create();
   //connection compiler for connection usage;
   final connectionsCompiler = FutureCompiler.create();
   //disconnection compiler for disconnection usage
@@ -1168,6 +1169,7 @@ class Network extends FlowNetwork{
    this.IIPSocketFilter = this.IIPSockets.iterator;
    this.iipDataIterator = this.IIPackets.iterator;
    this.scheduledPacketsIterator = this.scheduledPackets.iterator;
+   this.scheduledPacketsBackupIterator = this.scheduledPacketsBackup.iterator;
    this.placeholder = this.components.add(PlaceHolder.create('placeholder',hub.Hub.randomString(7)));
    this.uuidRegister.add('placeholder',this.placeholder.data.uuid);
    this.stateManager = hub.StateManager.create(this);
@@ -1369,6 +1371,13 @@ class Network extends FlowNetwork{
     return socket;
   }
 
+  void prepareScheduledPackets(){
+    this.scheduledPacketsBackupIterator.cascade((it){
+        this.scheduledPackets.add(it.current);
+    },(it){
+        this.runScheduledPackets();
+    });
+  }
   void schedulePacket(String id,String port,dynamic d){
     if(!this.uuidRegister.has(id)) return null;
 
@@ -1393,14 +1402,18 @@ class Network extends FlowNetwork{
   }
 
   void runScheduledPackets(){
-    this.scheduledPacketsIterator.cascade((it){
-      var cur = it.current;
-      this.filter(cur['id']).then((r){
-        if(!r.data.hasPort(cur['port'])) return null;
-        r.data.port(cur['port']).send(cur['data']);
-      });
-
-    });
+    while(hub.Valids.not(this.scheduledPackets.isEmpty)){
+      var node = this.scheduledPackets.removeHead(), cur;
+      if(hub.Valids.exist(node)){
+        cur = node.data;
+        this.scheduledPacketsBackup.add(cur);
+        this.filter(cur['id']).then((r){
+          if(!r.data.hasPort(cur['port'])) return null;
+          r.data.port(cur['port']).send(cur['data']);
+        });
+        node.free();
+      }
+    }
   }
 
   dynamic removeInitial(alias,[Function n]){
@@ -1565,7 +1578,8 @@ class Network extends FlowNetwork{
       }
 
       this.sendInitials();
-      this.runScheduledPackets();
+      /*this.runScheduledPackets();*/
+      this.prepareScheduledPackets();
       this.stateManager.switchState('alive');
       this.networkStream.emit({ 'type':"bootingNetwork", 'status':true,'message': 'booting network operations'});
       this.onAlive.emit(this);
@@ -1584,108 +1598,108 @@ class Network extends FlowNetwork{
 
   Future send(String id,String port,dynamic d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.send(d);
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.send(d);
         });
     });
   }
 
   Future tapEnd(String id,String port,Function d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.tapEnd(d);
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.tapEnd(d);
         });
     });
   }
 
   Future untapEnd(String id,String port,Function d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.untapEnd(d);
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.untapEnd(d);
         });
     });
   }
 
   Future tapData(String id,String port,Function d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.tapData(d);
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.tapData(d);
         });
     });
   }
 
   Future tapEndGroup(String id,String port,Function d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.tapBeginGroup(d);
+        var pt = _.data.pt(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.tapBeginGroup(d);
         });
     });
   }
 
   Future taoBeginGroup(String id,String port,Function d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.tapBeginGroup(d);
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.tapBeginGroup(d);
         });
     });
   }
 
   Future tap(String id,String port,Function d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.tap(d);
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.tap(d);
         });
     });
   }
 
   Future tapOnce(String id,String port,Function d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.tapOnce(d);
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.tapOnce(d);
         });
     });
   }
 
   Future untapOnce(String id,String port,Function d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.untapOnce(d);
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.untapOnce(d);
         });
     });
   }
 
   Future untap(String id,String port,Function d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.untap(d);
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.untap(d);
         });
     });
   }
 
   Future beginGroup(String id,String port,dynamic d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.beginGroup(d);
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.beginGroup(d);
         });
     });
   }
 
   Future endGroup(String id,String port,dynamic d,[bool bf]){
     return this.filter(id,bf).then((_){
-        var port = _.data.port(port);
-        hub.Funcs.when(Valids.exist(port),(){
-            port.endGroup(d);
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.endGroup(d);
         });
     });
   }
