@@ -169,7 +169,13 @@ class SocketStream<M>{
   static create() => new SocketStream();
   
   SocketStream();
-  
+
+  Streamable throttle(int ms,[Function n]){
+    var ms = MixedStreams.throttle(this.stream,ms);
+    if(n != null) ms.on(n);
+    return ms;
+  }
+
   dynamic get streamTransformer => this.stream.transformer;
 
   dynamic get streamDrained => this.stream.drained;
@@ -256,7 +262,9 @@ class Socket<M> extends FlowSocket{
 
     /*this.enableEndStreamEvent();*/
   }
-  
+ 
+  dynamic throttle(ms,[n]) => this.streams.throttle(ms,n);
+
   void enableEndOnDrainEvent(){
     this.streams.enableEndStreamEvent();
   }
@@ -551,6 +559,8 @@ class Port<M> extends FlowPort<M>{
     this.meta.update('id',id);
   }
     
+  dynamic throttle(ms,[n]) => this.socket.throttle(ms,n);
+
   void endStream() => this.socket.endStream();
 
   void enableEndOnDrainEvent(){
@@ -1577,6 +1587,87 @@ class Network extends FlowNetwork{
         var port = _.data.port(port);
         hub.Funcs.when(Valids.exist(port),(){
             port.send(d);
+        });
+    });
+  }
+
+  Future tapEnd(String id,String port,Function d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.tapEnd(d);
+        });
+    });
+  }
+
+  Future untapEnd(String id,String port,Function d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.untapEnd(d);
+        });
+    });
+  }
+
+  Future tapData(String id,String port,Function d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.tapData(d);
+        });
+    });
+  }
+
+  Future tapEndGroup(String id,String port,Function d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.tapBeginGroup(d);
+        });
+    });
+  }
+
+  Future taoBeginGroup(String id,String port,Function d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.tapBeginGroup(d);
+        });
+    });
+  }
+
+  Future tap(String id,String port,Function d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.tap(d);
+        });
+    });
+  }
+
+  Future tapOnce(String id,String port,Function d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.tapOnce(d);
+        });
+    });
+  }
+
+  Future untapOnce(String id,String port,Function d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.untapOnce(d);
+        });
+    });
+  }
+
+  Future untap(String id,String port,Function d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var port = _.data.port(port);
+        hub.Funcs.when(Valids.exist(port),(){
+            port.untap(d);
         });
     });
   }
