@@ -1106,7 +1106,7 @@ class Network extends FlowNetwork{
   //timestamps
   var startStamp,stopStamp;
   // iterator for the graph and iips
-  var graphIterator, iipDataIterator,scheduledPacketsIterator,scheduledPacketsBackupIterator;
+  var graphIterator, iipDataIterator,scheduledPacketsIterator,scheduledPacketsAlwaysIterator;
   // initial sockets list iterator
   var IIPSocketFilter;
   //graph node placeholder
@@ -1143,7 +1143,7 @@ class Network extends FlowNetwork{
   // list of initial packets to sent out on boot
   final IIPackets = ds.dsList.create();
   final scheduledPackets = ds.dsList.create();
-  final scheduledPacketsBackup = ds.dsList.create();
+  final scheduledPacketsAlways = ds.dsList.create();
   //connection compiler for connection usage;
   final connectionsCompiler = FutureCompiler.create();
   //disconnection compiler for disconnection usage
@@ -1169,7 +1169,7 @@ class Network extends FlowNetwork{
    this.IIPSocketFilter = this.IIPSockets.iterator;
    this.iipDataIterator = this.IIPackets.iterator;
    this.scheduledPacketsIterator = this.scheduledPackets.iterator;
-   this.scheduledPacketsBackupIterator = this.scheduledPacketsBackup.iterator;
+   this.scheduledPacketsAlwaysIterator = this.scheduledPacketsAlways.iterator;
    this.placeholder = this.components.add(PlaceHolder.create('placeholder',hub.Hub.randomString(7)));
    this.uuidRegister.add('placeholder',this.placeholder.data.uuid);
    this.stateManager = hub.StateManager.create(this);
@@ -1371,13 +1371,18 @@ class Network extends FlowNetwork{
     return socket;
   }
 
-  void prepareScheduledPackets(){
-    this.scheduledPacketsBackupIterator.cascade((it){
-        this.scheduledPackets.add(it.current);
-    },(it){
-        this.runScheduledPackets();
+  void alwaysSchedulePacket(String id,String port,dynamic d){
+    if(!this.uuidRegister.has(id)) return null;
+
+    this.scheduledPacketsAlways.add({'id':id,'port':port,'data': d});
+    if(this.isDead || this.isFrozen) return null;
+    
+    this.filter(id).then((r){
+        if(!r.data.hasPort(port)) return null;
+        r.data.port(port).send(d);
     });
   }
+
   void schedulePacket(String id,String port,dynamic d){
     if(!this.uuidRegister.has(id)) return null;
 
@@ -1386,6 +1391,19 @@ class Network extends FlowNetwork{
     if(this.isDead || this.isFrozen) return null;
     
     return this.runScheduledPackets();
+  }
+
+  void removeAlwaysScheduledPackets(String id,[String port]){
+    if(!this.uuidRegister.has(id)) return null;
+
+    this.scheduledPacketsAlways.remove(id,(it,n){
+      if(port != null){
+          if(it.current['id'] == id && it.current['port'] == port) return true;
+          return false;
+      };
+      if(it.current['id'] == id) return true;
+      return false;
+    });
   }
 
   void removeScheduledPackets(String id,[String port]){
@@ -1401,12 +1419,21 @@ class Network extends FlowNetwork{
     });
   }
 
+  void runBootUpScheduledPackets(){
+    this.scheduledPacketsAlwaysIterator.cascade((it){
+       var cur = it.current;
+      this.filter(cur['id']).then((r){
+          if(!r.data.hasPort(cur['port'])) return null;
+          r.data.port(cur['port']).send(cur['data']);
+      });
+    });
+  }
+
   void runScheduledPackets(){
     while(hub.Valids.not(this.scheduledPackets.isEmpty)){
       var node = this.scheduledPackets.removeHead(), cur;
       if(hub.Valids.exist(node)){
         cur = node.data;
-        this.scheduledPacketsBackup.add(cur);
         this.filter(cur['id']).then((r){
           if(!r.data.hasPort(cur['port'])) return null;
           r.data.port(cur['port']).send(cur['data']);
@@ -1578,8 +1605,8 @@ class Network extends FlowNetwork{
       }
 
       this.sendInitials();
-      /*this.runScheduledPackets();*/
-      this.prepareScheduledPackets();
+      this.runScheduledPackets();
+      this.runBootUpScheduledPackets();
       this.stateManager.switchState('alive');
       this.networkStream.emit({ 'type':"bootingNetwork", 'status':true,'message': 'booting network operations'});
       this.onAlive.emit(this);
@@ -1641,7 +1668,7 @@ class Network extends FlowNetwork{
     });
   }
 
-  Future taoBeginGroup(String id,String port,Function d,[bool bf]){
+  Future tapBeginGroup(String id,String port,Function d,[bool bf]){
     return this.filter(id,bf).then((_){
         var pt = _.data.port(port);
         hub.Funcs.when(hub.Valids.exist(pt),(){
@@ -2617,6 +2644,71 @@ class Component extends FlowComponent{
   void close(){
     this.disableSubnet();
     this.ports.onAll((n) => n.detach());
+  }
+
+  void _checkPort(String id){
+    if(this.hasPort(id)) return null;
+    return new Exception('$id port is not exisiting!');
+  }
+
+  void send(String port,dynamic d){
+    this._checkPort(port);
+    return this.port(port).send(d);
+  }
+
+  void tapEnd(String port,Function d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).tapEnd(d);
+  }
+
+  void untapEnd(String port,Function d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).untapEnd(d);
+  }
+
+  void tapData(String port,Function d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).tapData(d);
+  }
+
+  void tapEndGroup(String port,Function d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).tapEndGroup(d);
+  }
+
+  void tapBeginGroup(String port,Function d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).tapBeginGroup(d);
+  }
+
+  void tap(String port,Function d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).tap(d);
+  }
+
+  void tapOnce(String port,Function d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).tapOnce(d);
+  }
+
+  void untapOnce(String port,Function d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).untapOnce(d);
+  }
+
+  void untap(String port,Function d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).untap(d);
+  }
+
+  void beginGroup(String port,dynamic d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).beginGroup(d);
+  }
+
+  void endGroup(String port,dynamic d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).endGroup(d);
   }
 
 }

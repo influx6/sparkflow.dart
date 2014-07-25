@@ -443,5 +443,6 @@ class Sparkflow extends FlowAbstract{
   void sendInitials() => this.network.sendInitials();
 
   void schedulePacket(s,p,d) => this.network.schedulePacket(s,p,d);
+  void alwaysSchedulePacket(s,p,d) => this.network.schedulePacket(s,p,d);
 }
 
