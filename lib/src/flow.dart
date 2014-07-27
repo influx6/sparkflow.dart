@@ -40,7 +40,60 @@ abstract class FlowPort<M>{
   
 }
 
-abstract class FlowComponent{
+abstract class FlowComponentAbstract{
+
+  FlowComponent(id);
+      
+  hub.MapDecorator get sd;
+  FlowNetwork get belongsTo;
+  void set belongsTo(FlowNetwork n);
+  String get UID;
+  void removeMeta(id);
+  void setGroup(String g);
+  String get description;
+  void set description(String desc);
+  String get id;
+  String get group;
+  String get componentClassID;
+  void set id(String id);
+  Function get mutator;
+  bool get hasMutator;
+  void set mutator(Function n);
+  dynamic mutate(Function n);
+  dynamic meta(id,[val]);
+
+}
+
+
+abstract class FlowNetworkAbstract{
+  FlowNetwork(String id);
+  void addComponentInstance(FlowComponent n,String uniq);
+  void add(String n,String m);
+  void remove(String n);
+  void connect(String m,String mport,String n,String nport);
+  void disconnect(String m,String n,String j,String k);
+  String get id;
+  void set id(String id);
+  FlowComponent get belongsTo;
+  void set belongsTo(FlowComponent n);
+}
+
+class FlowNetwork extends FlowNetworkAbstract{
+  final metas = new hub.MapDecorator.from({'desc':'Sparkflow Network Graph'});
+  var _parent;
+
+  FlowNetwork(String id){
+    this.metas.add('id',id);
+  }
+
+  String get id => this.metas.get('id');
+  void set id(String id){ this.metas.update('id',id); }
+  
+  FlowComponent get belongsTo => this._parent;
+  void set belongsTo(FlowComponent n){ this._parent = n; }
+}
+
+class FlowComponent extends FlowComponentAbstract{
   final String uuid = hub.Hub.randomString(7);
   final metas = new hub.MapDecorator.from({'desc':'basic description'});
   final bindMeta = new hub.MapDecorator();
@@ -89,27 +142,6 @@ abstract class FlowComponent{
 
   Map get toMeta;
 
-}
-
-abstract class FlowNetwork{
-  final metas = new hub.MapDecorator.from({'desc':'Sparkflow Network Graph'});
-  var _parent;
-
-  FlowNetwork(String id){
-    this.metas.add('id',id);
-  }
-
-  void addComponentInstance(FlowComponent n,String uniq);
-  void add(String n,String m);
-  void remove(String n);
-  void connect(String m,String mport,String n,String nport);
-  void disconnect(String m,String n,String j,String k);
-
-  String get id => this.metas.get('id');
-  void set id(String id){ this.metas.update('id',id); }
-  
-  FlowComponent get belongsTo => this._parent;
-  void set belongsTo(FlowComponent n){ this._parent = n; }
 }
 
 final _nopacket = (){};
@@ -1105,10 +1137,8 @@ class Network extends FlowNetwork{
   var _parent;
   //timestamps
   var startStamp,stopStamp;
-  // iterator for the graph and iips
-  var graphIterator, iipDataIterator,scheduledPacketsIterator,scheduledPacketsAlwaysIterator;
-  // initial sockets list iterator
-  var IIPSocketFilter;
+  // iterator for the graph 
+  var graphIterator, scheduledPacketsIterator,scheduledPacketsAlwaysIterator;
   //graph node placeholder
   var placeholder;
   //network StateManager
@@ -1122,7 +1152,6 @@ class Network extends FlowNetwork{
 
   // the network error stream
   final errorStream = Streamable.create();
-  final iipStream = Streamable.create();
   final componentStream = Streamable.create();
   final networkStream = Streamable.create();
   final connectionStream = Streamable.create();
@@ -1138,10 +1167,6 @@ class Network extends FlowNetwork{
   
   // graph of loaded components
   final components = new ds.dsGraph<FlowComponent,int>();
-  // list of Initial Information Packets
-  final IIPSockets = ds.dsList.create();
-  // list of initial packets to sent out on boot
-  final IIPackets = ds.dsList.create();
   final scheduledPackets = ds.dsList.create();
   final scheduledPacketsAlways = ds.dsList.create();
   //connection compiler for connection usage;
@@ -1166,8 +1191,6 @@ class Network extends FlowNetwork{
    this.dfFilter.use(this.components);
    this.bfFilter.use(this.components);
    // this.graphIterator = this.components.iterator;
-   this.IIPSocketFilter = this.IIPSockets.iterator;
-   this.iipDataIterator = this.IIPackets.iterator;
    this.scheduledPacketsIterator = this.scheduledPackets.iterator;
    this.scheduledPacketsAlwaysIterator = this.scheduledPacketsAlways.iterator;
    this.placeholder = this.components.add(PlaceHolder.create('placeholder',hub.Hub.randomString(7)));
@@ -1272,7 +1295,6 @@ class Network extends FlowNetwork{
     this.connectionStream.pause();
     this.componentStream.pause();
     this.networkStream.pause();
-    this.iipStream.pause();
   }
 
   void unlockNetworkStreams(){
@@ -1281,7 +1303,6 @@ class Network extends FlowNetwork{
     this.connectionStream.resume();
     this.componentStream.resume();
     this.networkStream.resume();
-    this.iipStream.resume();
   }
 
   void closeNetworkStreams(){
@@ -1290,7 +1311,6 @@ class Network extends FlowNetwork{
     this.connectionStream.close();
     this.componentStream.close();
     this.networkStream.close();
-    this.iipStream.close();
   }
 
   Future get whenAlive => this._whenAlive.future;
@@ -1322,53 +1342,6 @@ class Network extends FlowNetwork{
     }).catchError((e){ 
       this.networkStream.emit(SparkFlowMessages.filterError(m,id,e,false));
     });
-  }
-
-  dynamic filterIIPSocket(alias,[Function n]){
-    var id = this.uuidRegister.get(alias);
-    if(id == null) return null;
-    var iip = this.IIPSocketFilter.get(id,IIPFilter);
-    if(iip == null) return null;
-    return iip.data;  
-  }
-
-  dynamic addIIPSocket(Component component,String id,[Function n]){
-    if(!this.uuidRegister.has(id)) return null;
-
-    if(this.filterIIPSocket(id) != null) return null;
-
-    var iip = IIPMeta.create(component.uuid,id,Socket.create(),component);
-    if(n != null) n(iip);
-
-    this.IIPSockets.add(iip);
-    this.iipStream.emit(SparkFlowMessages.IIPSocket(true,id,component.uuid));
-    return iip;
-  }
-
-  dynamic removeIIPSocket(alias,[Function fn]){
-    if(!this.uuidRegister.has(alias)) return null;
-    var id = this.uuidRegister.get(alias);
-    if(id == null) return null;
-    var sock =  this.IIPSocketFilter.remove(id,IIPFilter);
-    if(fn != null) fn(sock);
-    sock.selfDestruct();
-    this.iipStream.emit(SparkFlowMessages.IIPSocket(false,id,sock.component.uuid));
-    return sock;
-  }
-
-  dynamic addInitial(alias,data){
-    if(!this.uuidRegister.has(alias)) return null;
-
-    if(this.isDead || this.isFrozen){
-        this.iipStream.emit(SparkFlowMessages.IIP(true,alias));
-        return this.IIPackets.add({ 'alias':alias, 'data': data});
-    };
-
-    var socket = this.filterIIPSocket(alias);
-    if(socket != null) socket.socket.send(data);
-
-    this.iipStream.emit(SparkFlowMessages.IIP(true,alias));
-    return socket;
   }
 
   void alwaysSchedulePacket(String id,String port,dynamic d){
@@ -1443,39 +1416,13 @@ class Network extends FlowNetwork{
     }
   }
 
-  dynamic removeInitial(alias,[Function n]){
-    if(!this.uuidRegister.has(alias) || this.isAlive) return null;
-
-    var data,uuid = this.uuidRegister.get(alias);
-    data = this.iipDataIterator.remove(uuid,IIPDataFilter);
-    if(n != null) n(data);
-    this.iipStream.emit(SparkFlowMessages.IIP(false,alias));
-    return data;
-  }
-
-  void sendInitials(){
-    if(this.isAlive || this.IIPackets.isEmpty) return null;
-    this.iipDataIterator.cascade((it){
-      var f = it.current;
-      var socket = this.filterIIPSocket(f['alias']);
-      if(socket != null) socket.socket.send(f['data']);
-    },(it){
-      this.IIPackets.clear();
-    });
- 
-    this.iipStream.emit({ 'type':"sendInitial", 'message': 'sending out all initials' });
-  }
-
   Future _addComponent(FlowComponent a,String id,[Function n]){
     var node = this.components.add(a);
     this.components.bind(this.placeholder,node,0);
     this.components.bind(node,this.placeholder,1);
     this.uuidRegister.add(id,a.uuid);
-    this.addIIPSocket(a,id,(meta){
-      meta.socket.attachPort(meta.component.port('static:option'));
-      if(n != null) n(meta.component);
-    });
     this.componentStream.emit(SparkFlowMessages.component('addComponent',id,a.uuid));
+    if(n != null) n(meta.component);
     return new Future.value(node);
   }
 
@@ -1503,7 +1450,6 @@ class Network extends FlowNetwork{
       if(n != null) n(_.data);
       _.data.detach();
       this.components.eject(_);
-      this.removeIIPSocket(a);
       this.componentStream.emit(SparkFlowMessages.component('removeComponent',a,_.data.uuid));
     }).catchError((e){
       this.componentStream.emit({'type':'network-remove', 'error': e, 'component': a });
@@ -1604,7 +1550,6 @@ class Network extends FlowNetwork{
         });
       }
 
-      this.sendInitials();
       this.runScheduledPackets();
       this.runBootUpScheduledPackets();
       this.stateManager.switchState('alive');
@@ -1628,6 +1573,24 @@ class Network extends FlowNetwork{
         var pt = _.data.port(port);
         hub.Funcs.when(hub.Valids.exist(pt),(){
             pt.send(d);
+        });
+    });
+  }
+
+  Future beginGroup(String id,String port,dynamic d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.beginGroup(d);
+        });
+    });
+  }
+
+  Future endGroup(String id,String port,dynamic d,[bool bf]){
+    return this.filter(id,bf).then((_){
+        var pt = _.data.port(port);
+        hub.Funcs.when(hub.Valids.exist(pt),(){
+            pt.endGroup(d);
         });
     });
   }
@@ -1713,23 +1676,6 @@ class Network extends FlowNetwork{
     });
   }
 
-  Future beginGroup(String id,String port,dynamic d,[bool bf]){
-    return this.filter(id,bf).then((_){
-        var pt = _.data.port(port);
-        hub.Funcs.when(hub.Valids.exist(pt),(){
-            pt.beginGroup(d);
-        });
-    });
-  }
-
-  Future endGroup(String id,String port,dynamic d,[bool bf]){
-    return this.filter(id,bf).then((_){
-        var pt = _.data.port(port);
-        hub.Funcs.when(hub.Valids.exist(pt),(){
-            pt.endGroup(d);
-        });
-    });
-  }
 
   Map get toMeta{
     var meta = {};
@@ -1772,7 +1718,7 @@ class Network extends FlowNetwork{
       meta['*'].remove('ports');
     },(meta,comp){
         var m = meta[comp.id] = comp.toMeta;
-        m['connections'] = comp.connectionsMap;
+        m['connections'] = comp.connections;
         m.remove('portClass');
         m.remove('ports');
         m.remove('metas');
@@ -1825,6 +1771,62 @@ class Network extends FlowNetwork{
 
   void onDeadNetwork(Function n){
     this.onDead.on(n);
+  }
+
+  void ensureSetBinding(String from,String fp,List tolist,String tp,[String sid,bool f]){
+    tolist.forEach((k){
+      this.onAliveConnect((net){
+         return this.doBinding(from,fp,k,tp,sid,f);
+      });
+    });
+  }
+
+  void ensureSetUnbinding(String from,String fp,List tolist,[String sid,bool f]){
+    tolist.forEach((k){
+      this.onDeadDisconnect((net){
+         return this.doUnBinding(from,fp,k,tp,sid,f);
+      });
+    });
+  }
+
+  tpoid looseSetBinding(String from,String fp,List tolist,[String sid,bool f]){
+    tolist.forEach((k){
+       return this.doBinding(from,fp,k,tp,sid,f);
+    });
+  }
+
+  void looseSetUnbinding(String from,String fp,List tolist,[String sid,bool f]){
+    tolist.forEach((k){
+       return this.doUnBinding(from,fp,k,tp,sid,f);
+    });
+  }
+
+  void ensureAllBinding(String from,String fp,Map tolist,[String sid,bool f]){
+    tolist.forEach((k,v){
+      this.onAliveConnect((net){
+         return this.doBinding(from,fp,k,v,sid,f);
+      });
+    });
+  }
+
+  void ensureAllUnbinding(String from,String fp,Map tolist,[String sid,bool f]){
+    tolist.forEach((k,v){
+      this.onDeadDisconnect((net){
+         return this.doUnBinding(from,fp,k,v,sid,f);
+      });
+    });
+  }
+
+  void looseAllBinding(String from,String fp,Map tolist,[String sid,bool f]){
+    tolist.forEach((k,v){
+       return this.doBinding(from,fp,k,v,sid,f);
+    });
+  }
+
+  void looseAllUnbinding(String from,String fp,Map tolist,[String sid,bool f]){
+    tolist.forEach((k,v){
+       return this.doUnBinding(from,fp,k,v,sid,f);
+    });
   }
 
   void ensureBinding(String from,String fp,String to,String tp,[String sid,bool f]){
@@ -1912,11 +1914,11 @@ class Network extends FlowNetwork{
       });
 
       hub.Funcs.when((from == "*" && to != '*'),(){
-        return this.link(fp,to,tp,sid,f,true);
+        return this.link(fp,to,tp,sid,f,false);
       });
 
       hub.Funcs.when((from != "*" && to == '*'),(){
-        return this.link(tp,from,fp,sid,f); 
+        return this.link(tp,from,fp,sid,f,true); 
       });
 
   }
@@ -1943,11 +1945,11 @@ class Network extends FlowNetwork{
       });
 
       hub.Funcs.when((from == "*" && to != '*'),(){
-        return this.unlink(fp,to,tp,sid,f,true);
+        return this.unlink(fp,to,tp,sid,f,false);
       });
 
       hub.Funcs.when((from != "*" && to == '*'),(){
-        return this.unlink(tp,from,fp,sid,f);
+        return this.unlink(tp,from,fp,sid,f,true);
       });
 
   }
@@ -2223,6 +2225,9 @@ class PortGroup{
     });
   }
 
+  String toString(){
+    return this.portLists.toString();
+  }
 }
 
 class PortManager{
@@ -2273,7 +2278,7 @@ class PortManager{
       var path = splitPortMap(id),
           finder = hub.Enums.nthFor(path);
 
-      if(hub.Valids.notExist(path) || !this.hasSpace(finder(0))) return null;
+      if(hub.Valids.notExist(path) || !this.hasSpace(finder(0))) this.createSpace(finder(0));
 
       if(hub.Valids.exist(port)) this.portsGroup.get(finder(0)).addInportObject(finder(1),port);
       else this.portsGroup.get(finder(0)).addInport(finder(1),meta);
@@ -2285,7 +2290,7 @@ class PortManager{
       var path = splitPortMap(id),
           finder = hub.Enums.nthFor(path);
 
-      if(hub.Valids.notExist(path) || !this.hasSpace(finder(0))) return null;
+      if(hub.Valids.notExist(path) || !this.hasSpace(finder(0))) this.createSpace(finder(0));
 
       if(hub.Valids.exist(port)) this.portsGroup.get(finder(0)).addOutPortObject(finder(1),port);
       else this.portsGroup.get(finder(0)).addOutPort(finder(1),meta);
@@ -2399,6 +2404,10 @@ class PortManager{
 
       });
     }
+
+    String toString(){
+       return this.portsGroup.toString();
+    }
 }
 
 /*class for component*/
@@ -2409,7 +2418,7 @@ class Component extends FlowComponent{
   final freezups = Distributor.create('connection_freeze');
   final shutdowns = Distributor.create('connection_shutdowns');
   hub.StateManager sharedState;
-  var connections,network;
+  var _connections,network;
   PortManager comPorts;
 
   static create([String id]) => new Component(id);
@@ -2436,7 +2445,7 @@ class Component extends FlowComponent{
 
   Component([String id]): super((id == null ? 'Component' : id)){
     this.comPorts = PortManager.create(this);
-    this.connections = ConnectionMeta.create(this);
+    this._connections = ConnectionMeta.create(this);
     this.sharedState = hub.StateManager.create(this);
 
     this.sharedState.add('booted',{
@@ -2457,19 +2466,15 @@ class Component extends FlowComponent{
       'alive': (t,c){ return false; },
     });
 
-    this.createSpace('static');
-    this.makeInport('static:option',port:Inport.create('option',{
-      'required': true
-    },this));
 
     this.connectionStream.on((e){
       
       hub.Funcs.when(hub.Valids.match(e['type'],'bind'),(){
-        this.connections.addConnection(e['fromPort'],e['to'],e['toPort'],e['socketid']);
+        this._connections.addConnection(e['fromPort'],e['to'],e['toPort'],e['socketid']);
       });
 
       hub.Funcs.when(hub.Valids.match(e['type'],'unbind'),(){
-        this.connections.removeConnection(e['fromPort'],e['to'],e['toPort'],e['socketid']);
+        this._connections.removeConnection(e['fromPort'],e['to'],e['toPort'],e['socketid']);
       });
 
     });
@@ -2477,6 +2482,7 @@ class Component extends FlowComponent{
     this.sharedState.switchState('shutdown');
   }
   
+
   bool get isAlive{
     return this.sharedState.run('alive');
   }
@@ -2513,6 +2519,18 @@ class Component extends FlowComponent{
     return this.comPorts.createOutport(id,meta:meta,port:port);
   }
 
+  FlowPort createProxyInport(String id,{Map meta, Inport port:null}){
+    this.enableSubnet();
+    var pt = this.makeInport(id,meta:meta,port:port);
+    this.network.makeInport(id,meta:meta,port: pt);
+  }
+
+  FlowPort createProxyOutport(String id,{Map meta, Inport port:null}){
+    this.enableSubnet();
+    var pt = this.makeOutport(id,meta:meta,port:port);
+    this.network.makeOutport(id,meta:meta,port: pt);
+  }
+
   void createDefaultPorts(){
     this.createSpace('in');
     this.createSpace('out');
@@ -2533,6 +2551,7 @@ class Component extends FlowComponent{
   }
 
   void enableSubnet(){
+    if(hub.Valids.exist(this.network)) return null;
     this.network = Network.create(this.id+':Subnet');
   }
 
@@ -2542,8 +2561,8 @@ class Component extends FlowComponent{
     this.network = null;
   }
 
-  Map get connectionsMap{
-    return new Map.from(this.connections.storage);
+  Map get connections{
+    return new Map.from(this._connections.storage);
   }
 
   void ensureOnBoot(Function n){
@@ -2656,6 +2675,16 @@ class Component extends FlowComponent{
     return this.port(port).send(d);
   }
 
+  void beginGroup(String port,dynamic d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).beginGroup(d);
+  }
+
+  void endGroup(String port,dynamic d,[bool bf]){
+    this._checkPort(port);
+    return this.port(port).endGroup(d);
+  }
+
   void tapEnd(String port,Function d,[bool bf]){
     this._checkPort(port);
     return this.port(port).tapEnd(d);
@@ -2701,14 +2730,5 @@ class Component extends FlowComponent{
     return this.port(port).untap(d);
   }
 
-  void beginGroup(String port,dynamic d,[bool bf]){
-    this._checkPort(port);
-    return this.port(port).beginGroup(d);
-  }
-
-  void endGroup(String port,dynamic d,[bool bf]){
-    this._checkPort(port);
-    return this.port(port).endGroup(d);
-  }
 
 }

@@ -377,6 +377,38 @@ class Sparkflow extends FlowAbstract{
     this.network.onDeadNetwork(n);
   }
 
+  void ensureSetBinding(String from,String fp,List to,String tp,[String sid,bool f]){
+    return this.network.ensureSetBinding(from,fp,to,tp,sid,f);
+  }
+
+  void ensureSetUnbinding(String from,String fp,List to,String tp,[String sid,bool f]){
+    return this.network.ensureSetUnbinding(from,fp,to,tp,sid,f);
+  }
+
+  void looseSetBinding(String from,String fp,List to,String tp,[String sid,bool f]){
+    return this.network.looseSetBinding(from,fp,to,tp,sid,f);
+  }
+
+  void looseSetUnbinding(String from,String fp,List to,String tp,[String sid,bool f]){
+    return this.network.looseSetUnbinding(from,fp,to,tp,sid,f);
+  }
+
+  void ensureAllBinding(String from,String fp,Map to,[String sid,bool f]){
+    return this.network.ensureAllBinding(from,fp,to,sid,f);
+  }
+
+  void ensureAllUnbinding(String from,String fp,Map to,[String sid,bool f]){
+    return this.network.ensureAllUnbinding(from,fp,to,sid,f);
+  }
+
+  void looseAllBinding(String from,String fp,Map to,[String sid,bool f]){
+    return this.network.looseAllBinding(from,fp,to,sid,f);
+  }
+
+  void looseAllUnbinding(String from,String fp,Map to,[String sid,bool f]){
+    return this.network.looseAllUnbinding(from,fp,to,sid,f);
+  }
+
   void ensureBinding(String from,String fp,String to,String tp,[String sid,bool f]){
     return this.network.ensureBinding(from,fp,to,tp,sid,f);
   }
