@@ -21,8 +21,8 @@ class PacketList{
     this.iterator = this.packets.iterator;
   }
 
-  void data(dynamic n){
-    this.packet(Packet.create().init('data',n,null,null));
+  void data(dynamic n,[own,pid]){
+    this.packet(Packet.create().init('data',n,own,pid));
   }
 
   void packet(Packet p){
@@ -141,6 +141,7 @@ class Packet extends hub.MapDecorator{
     buffer.write('\t owner: ${this.owner}\n');
     buffer.write('\t data: ${this.data}\n');
     buffer.write('\t port: ${this.port}\n');
+    buffer.write('\t packetList: ${this.lists}\n');
     return buffer.toString();
   }
 
