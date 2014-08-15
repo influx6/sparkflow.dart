@@ -67,7 +67,7 @@ abstract class FlowComponentAbstract{
 
 abstract class FlowNetworkAbstract{
   FlowNetwork(String id);
-  void addComponentInstance(FlowComponent n,String uniq);
+  void addComponent(FlowComponent n,String uniq);
   void add(String n,String m);
   void remove(String n);
   void connect(String m,String mport,String n,String nport);
@@ -924,6 +924,14 @@ class OutportType{
   String get name =>'Outport';
 }
 
+class ArrayPortType{
+  const ArrayPortType();
+  bool get isArrayPort => true;
+  bool get isInport => false;
+  bool get isInport => false;
+  String get name =>'Outport';
+}
+
 class Inport extends Port{
     final portType = const InPortType();
     
@@ -943,11 +951,45 @@ class Outport extends Port{
     String get portClass => this.portType.name;
 }
 
+class _ArrayPort{
+  final portType = const ArrayPortType();
+  List<Port> ports;
+  Map meta;
+  String id;
+
+  _ArrayPort(int total,String id,Map m){
+     this.port = new List<Port>(total);
+     this.id = id;
+     this.meta = m;
+  }
+
+  String get portClass => this.portType.name;
+
+  FlowPort getPort(int n){
+    if(n > this.ports.length) return null;
+    return this.ports.elementAt(n);
+  }
+}
+
+class ArrayInport extends _ArrayPort{
+   ArrayInport(int n,String id,Map m): super(n,id,m){
+      hub.Funcs.cycle(n,(i){
+        this.ports.add(Inport.create(i,{'desc':'$i indexed port'}));
+      });
+   }
+}
+
+class ArrayOutport extends _ArrayPort{
+   ArrayOutport(int n,String id,Map m): super(n,id,m){
+      hub.Funcs.cycle(n,(i){
+        this.ports.add(Outport.create(i,{'desc':'$i indexed port'}));
+      });
+   }
+}
+
 class PlaceHolder{
   String id,uuid;
-
   static create(id,uuid) => new PlaceHolder(id,uuid);
-
   PlaceHolder(this.id,this.uuid);
 }
 
@@ -1162,9 +1204,9 @@ class Network extends FlowNetwork{
       return null;
   });
 
-  static create(id) => new Network(id);
+  static create(id,[desc]) => new Network(id,desc);
 
-  Network(id): super(id){
+  Network(id,[String desc]): super(id){
    this.networkPorts = PortManager.create(this);
    this.dfFilter.use(this.components);
    this.bfFilter.use(this.components);
@@ -1198,6 +1240,7 @@ class Network extends FlowNetwork{
    this.stateManager.switchState('dead');
    this.metas.add('uuid',this.uuid);
    this.metas.add('id',this.id);
+   if(hub.Valids.exist(desc)) this.metas.add('description',desc);
 
    this.connectionStream.on((e){
 
@@ -1346,7 +1389,7 @@ class Network extends FlowNetwork{
 
     if(this.isDead || this.isFrozen) return null;
     
-    return this.runScheduledPackets();
+    return this._runScheduledPackets();
   }
 
   void removeAlwaysScheduledPackets(String id,[String port]){
@@ -1375,7 +1418,7 @@ class Network extends FlowNetwork{
     });
   }
 
-  void runBootUpScheduledPackets(){
+  void _runBootUpScheduledPackets(){
     this.scheduledPacketsAlwaysIterator.cascade((it){
        var cur = it.current;
       this.filterNode(cur['id']).then((r){
@@ -1385,7 +1428,7 @@ class Network extends FlowNetwork{
     });
   }
 
-  void runScheduledPackets(){
+  void _runScheduledPackets(){
     while(hub.Valids.not(this.scheduledPackets.isEmpty)){
       var node = this.scheduledPackets.removeHead(), cur;
       if(hub.Valids.exist(node)){
@@ -1404,7 +1447,7 @@ class Network extends FlowNetwork{
     }
   }
 
-  Future _addComponent(FlowComponent a,String id,[Function n]){
+  Future useComponent(FlowComponent a,String id,[Function n]){
     var node = this.components.add(a);
     this.components.bind(this.placeholder,node,0);
     this.components.bind(node,this.placeholder,1);
@@ -1414,18 +1457,14 @@ class Network extends FlowNetwork{
     return new Future.value(node);
   }
 
-  Future addComponentInstance(FlowComponent a,String id,[Function n]){
-    return this._addComponent(a,id,n);
-  }
-
-  Future add(String path,String id,[Function n,List a,Map m]){
+  Future use(String path,String id,[Function n,List a,Map m]){
     if(!Sparkflow.registry.has(path)) return new Future.error(new Exception('Component $path not found!'));
-    return this._addComponent(Sparkflow.registry.generate(path,a,m),id,n);
+    return this.useComponent(Sparkflow.registry.generate(path,a,m),id,n);
   }
 
   Future destroy(String name,[Function n,bool bf]){
     if(!this.uuidRegister.has(name)) return null;
-    this.remove(name,n,bf).then((_){
+    return this.remove(name,n,bf).then((_){
       return _.data.kill();
     });
   }
@@ -1538,8 +1577,8 @@ class Network extends FlowNetwork{
         });
       }
 
-      this.runScheduledPackets();
-      this.runBootUpScheduledPackets();
+      this._runScheduledPackets();
+      this._runBootUpScheduledPackets();
       this.stateManager.switchState('alive');
       this.networkStream.emit({ 'type':"bootingNetwork", 'status':true,'message': 'booting network operations'});
       this.onAlive.emit(this);
@@ -1558,7 +1597,7 @@ class Network extends FlowNetwork{
 
   Future _internalPort(String port,Function n,[dynamic d,bool bf]){
       var c = new Completer();
-      if(this.hasPort(port)) c.completeError(new Exception("${this.UID} has not port $port"));
+      if(this.hasPort(port)) c.completeError(new Exception("${this.UID} has no port called $port"));
       else{
         var pt = this.port(port);
         c.complete(pt);
