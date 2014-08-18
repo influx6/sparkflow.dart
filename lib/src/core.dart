@@ -255,7 +255,7 @@ class SparkRegistry{
 }
 
 class SparkRegistryManager{
-  final SparkGroups groups = hub.MapDecorator.create();
+  final groups = hub.MapDecorator.create();
 
   static create() => new SparkRegistryManager();
 
