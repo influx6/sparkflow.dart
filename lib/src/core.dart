@@ -255,7 +255,7 @@ class SparkRegistry{
 }
 
 class SparkRegistryManager{
-  final groups = hub.MapDecorator.create();
+  hub.MapDecorator registery_groups = hub.MapDecorator.create();
 
   static create() => new SparkRegistryManager();
 
@@ -273,17 +273,17 @@ class SparkRegistryManager{
 
   void registerNS(String namespace){
     namespace = namespace.toLowerCase();
-    this.groups.add(namespace,SparkRegistry.create());
+    this.registery_groups.add(namespace,SparkRegistry.create());
   }
 
   void unregisterNS(String namespace){
     namespace = namespace.toLowerCase();
-    this.groups.destroy(namespace);
+    this.registery_groups.destroy(namespace);
   }
 
   bool hasNS(String nm){
     nm = nm.toLowerCase();
-    return this.groups.has(nm);
+    return this.registery_groups.has(nm);
   }
 
   bool has(String nm){
@@ -298,7 +298,7 @@ class SparkRegistryManager{
   dynamic registry(String nm){
     nm = nm.toLowerCase();
     if(!this.hasNS(nm)) return null;
-    return this.groups.get(nm);
+    return this.registery_groups.get(nm);
   }
 
   dynamic ns(String nm) => this.registry(nm);
@@ -334,7 +334,9 @@ class SparkRegistryManager{
 
 }
 
-class Sparkflow extends FlowAbstract{
+class Sparkflow{
+  
+  const Sparkflow();
   
   static SparkRegistryManager registry = SparkRegistryManager.create();
 

@@ -36,13 +36,14 @@ abstract class FlowPort<M>{
   void untapOnce(String n,Function m);
   void tap(String n,Function m);
   void tapOnce(String n,Function m);
+  void forceCondition(Function n);
+  void forceBGCondition(Function n);
+  void forceEGCondition(Function n);
   void flushPackets();
   
 }
 
 abstract class FlowComponentAbstract{
-
-  FlowComponent(id);
       
   hub.MapDecorator get sd;
   FlowNetwork get belongsTo;
@@ -66,9 +67,8 @@ abstract class FlowComponentAbstract{
 
 
 abstract class FlowNetworkAbstract{
-  FlowNetwork(String id);
-  void addComponent(FlowComponent n,String uniq);
-  void add(String n,String m);
+  void useComponent(FlowComponent n,String uniq);
+  void use(String n,String m);
   void remove(String n);
   void connect(String m,String mport,String n,String nport);
   void disconnect(String m,String n,String j,String k);
@@ -91,6 +91,12 @@ class FlowNetwork extends FlowNetworkAbstract{
   
   FlowComponent get belongsTo => this._parent;
   void set belongsTo(FlowComponent n){ this._parent = n; }
+  
+  void useComponent(FlowComponent n,String uniq){ throw "Implement this"; }
+  void use(String n,String m){throw "Implement this";}
+  void remove(String n){throw "Implement this";}
+  void connect(String m,String mport,String n,String nport){throw "Implement this";}
+  void disconnect(String m,String n,String j,String k){throw "Implement this";}
 }
 
 class FlowComponent extends FlowComponentAbstract{
@@ -140,38 +146,40 @@ class FlowComponent extends FlowComponentAbstract{
     return this.metas.get(id); 
   }
 
-  Map get toMeta;
+  Map get toMeta{
+    return {};
+  }
 
 }
 
-final _nopacket = (){};
+Function _nopacket = (){};
 
-final socketFilter = (i,n){
+bool  socketFilter(i,n){
   var socks = i.current;
   if(socks.get('socket') == n) return true;
   return false;
-};
+}
 
 //filters of socket subscribers with aliases
-final aliasFilterFn = (it,n){
+bool aliasFilterFn(it,n){
   if(it.current.info.get('alias') == n) return true;
   return false;
-};
+}
 
-final List splitPortMap = (String path){
+List splitPortMap(String path){
   var part = path.split(':');
   if(part.length <= 1) return null;
   return part;
-};
+}
 
-final List registryPathProcessor = (String path){
+List registryPathProcessor (String path){
     path = path.toLowerCase();
     var from = path.split('/');
     if(from.length < 3) return null;
     return from;
-};
+}
 
-final toIP = (type,socket,packets){
+Function toIP(type,socket,packets){
   return (data){
     if(data is Packet) return data;
     var d = hub.Funcs.switchUnless(data,null);
@@ -181,7 +189,7 @@ final toIP = (type,socket,packets){
     packet.init(type,d,owner,port);
     return packet;
   };
-};
+}
 
 class SocketStream<M>{
   final String uuid = hub.Hub.randomString(3);
@@ -192,8 +200,8 @@ class SocketStream<M>{
   
   SocketStream();
 
-  Streamable throttle(int ms,[Function n]){
-    var ms = MixedStreams.throttle(this.stream,ms);
+  Streamable throttle(int mss,[Function n]){
+    var ms = MixedStreams.throttle(this.stream,mss);
     if(n != null) ms.on(n);
     return ms;
   }
@@ -254,7 +262,7 @@ class Socket<M> extends FlowSocket{
   final Distributor onSocketSubscription = Distributor.create('streamable-socketsub');
   final Distributor onSocketRemoval = Distributor.create('streamable-socketUnsub');
 
-  hub.ConditionMutator bgconditions,egconditions,dtconditions;
+  hub.Condition bgconditions,egconditions,dtconditions;
   /* hub.Counter counter; */
   Function toBGIP,toEGIP,toDataIP;
   SocketStream streams;
@@ -928,7 +936,7 @@ class ArrayPortType{
   const ArrayPortType();
   bool get isArrayPort => true;
   bool get isInport => false;
-  bool get isInport => false;
+  bool get isOutport => false;
   String get name =>'Outport';
 }
 
@@ -2167,16 +2175,16 @@ class PortGroup{
   final portLists = new hub.MapDecorator();
   FlowComponent owner;
   String groupClass;
-
-  var _packets = (d,w,r,e){
-    var ip = Packet.create();
-    ip.init(d,w,r,e);
-    return ip;
-  };
   
   static create(g,[m]) => new PortGroup(g,m);
 
   PortGroup(this.groupClass,[this.owner]);
+
+  dynamic _packets(d,w,r,e){
+    var ip = Packet.create();
+    ip.init(d,w,r.UID,e);
+    return ip;
+  }
   
   Map get toMeta{
     var m = {};
@@ -2196,18 +2204,18 @@ class PortGroup{
     return m;
   }
   
-  void getPort(String name){
+  dynamic getPort(String name){
     return this.portLists.get(name);
   }
   
-  void addInport(String name,Map m){
-    this._addPort(name,m,(a,b,c){
+  dynamic addInport(String name,Map m){
+    return this._addPort(name,m,(a,b,c){
         return Inport.create(a,b,c);
     });
   }
 
-  void addOutPort(String name,Map m){
-    this._addPort(name,m,(a,b,c){
+  dynamic addOutPort(String name,Map m){
+    return this._addPort(name,m,(a,b,c){
         return Outport.create(a,b,c);
     });
   }

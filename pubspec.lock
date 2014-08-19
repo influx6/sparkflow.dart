@@ -10,8 +10,6 @@ packages:
     source: hosted
     version: "0.9.1"
   streamable:
-    description:
-      path: "../streamable"
-      relative: true
-    source: path
-    version: "0.2.7"
+    description: streamable
+    source: hosted
+    version: "0.2.9"
